@@ -1,0 +1,41 @@
+{
+	"geode": "5.0.0",
+	"gd": {
+		"win": "2.2081",
+		"android": "2.2081"
+	},
+	"id": "namakamu.gdspeedmacro",
+	"name": "GD Speed Macro",
+	"version": "v1.0.0",
+	"developer": "namakamu",
+	"description": "Speed control + perekam/pemutar macro (format GDR2, kompatibel dengan bot lain). Aman: progres level tidak tersimpan saat speed diubah / macro diputar.",
+	"settings": {
+		"speed": {
+			"type": "float",
+			"name": "Kecepatan game",
+			"description": "1.0 = normal. Selain 1.0, progres level TIDAK disimpan (safe mode).",
+			"default": 1.0,
+			"min": 0.1,
+			"max": 5.0,
+			"control": {
+				"slider": true,
+				"input": true
+			}
+		},
+		"macro-file": {
+			"type": "file",
+			"name": "File macro untuk dimuat",
+			"description": "Pilih file macro (.gdr2 / .gdr dari bot lain), lalu tekan tombol Muat di menu pause.",
+			"default": "",
+			"control": {
+				"dialog": "open",
+				"filters": [
+					{
+						"files": ["*.gdr2", "*.gdr"],
+						"description": "Geometry Dash Replay"
+					}
+				]
+			}
+		}
+	}
+}
