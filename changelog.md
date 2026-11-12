@@ -1,16 +1,33 @@
-# v1.3.1
-- Renamed to Replay Tools
-- Shorter documentation
+# Changelog
 
-# v1.3.0
-- Safe mode toggle (default: on) and No Clip
+## v1.3.1
 
-# v1.2.0
-- Redesigned menu, automatic file naming, macro deletion
-- Fix: macro inputs were blocked by the mod's own hook
+- Fixed a build error caused by invalid content at the top of `src/main.cpp`
+- Safe mode now also covers No Clip: the level is marked as test mode while it is on
+- Menu text and settings polished
 
-# v1.1.0
-- Hotkey menu, speed presets, multi-format macro loading
+## v1.3.0
 
-# v1.0.0
+- Added No Clip (resets when the game restarts)
+- Added safe mode toggle to the menu, on by default
+- Added a "Safe mode off" warning when progress could be saved
+
+## v1.2.0
+
+- Added support for loading GDR2/GDR and zBot `.zbf` macros
+- Macros recorded at other TPS values are converted to 240 TPS automatically
+- Added a macro file list with load, delete (with confirmation) and open-folder buttons
+- Added a setting to choose a macro file and load it with the **From Settings** button
+
+## v1.1.0
+
+- Added macro recording and playback at 240 TPS using the GDR2 format
+- Macros are saved as `<level ID>_<level name>.gdr2`; existing files are never overwritten
+- Manual input is blocked while a macro is playing
+
+## v1.0.0
+
 - Initial release
+- Added an in-game menu opened with a hotkey (default `Y`, configurable in settings)
+- Added speed control with presets from 0.25x to 5x and fine adjustment buttons
+- Added safe mode: levels are marked as test mode when speed is changed, so progress is not saved or submitted
