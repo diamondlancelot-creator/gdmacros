@@ -1,37 +1,64 @@
-# GD Speed Macro (mod Geode)
+# GD Speed Macro
 
-Fitur: kontrol kecepatan game, rekam/putar macro berbasis frame, simpan dan muat macro format GDR2
-(format yang dipakai bot lain). Safe mode: saat speed bukan 1.0 atau macro sedang diputar, level
-ditandai test mode sehingga progres/persen/completion tidak tersimpan.
+Mod Geode untuk Geometry Dash yang menyediakan pengatur kecepatan game serta perekam dan pemutar macro,
+dikendalikan dari satu menu yang dibuka dengan hotkey di dalam level.
 
-## Build (Windows)
-1. Install Visual Studio 2022 (workload "Desktop development with C++"), CMake, Git.
-2. Install Geode CLI dari github.com/geode-sdk/cli/releases, lalu:
-   geode config setup
-   geode sdk install
-3. Di folder ini:
-   geode build
-   File .geode hasilnya ada di folder build/ dan biasanya otomatis dipasang ke profil Geode.
-   Kalau tidak, salin ke folder geode/mods di folder Geometry Dash.
-4. Kalau ada error CMake/mod.json: jalankan `geode new`, lalu salin src/main.cpp,
-   bagian "settings" dari mod.json, dan 2 baris CPM/libGDR dari CMakeLists.txt ke proyek baru itu.
+Versi saat ini: **1.2.0** | Geode: **5.11.2** | Geometry Dash: **2.2081** | Platform: Windows
 
-## Pakai
-- Buka menu pause di level. Tombol di sisi kanan: Rekam, Putar, Simpan, Muat, Speed -, Speed +.
-- Rekam: mulai dari awal level (normal mode). Berhenti saat tekan lagi, selesai level, atau keluar level.
-  Macro otomatis disimpan di folder save mod (geode/config/<id>/macros) sebagai .gdr2.
-- Muat macro orang lain: Settings mod -> "File macro untuk dimuat" -> pilih file -> menu pause -> Muat -> Putar.
-- Speed juga bisa diatur lewat slider di Settings mod.
+## Fitur
+
+- **Menu terpisah.** Tekan `Y` di dalam level untuk membuka menu mod. Game dijeda otomatis selama menu terbuka.
+  Tombol dapat diganti di pengaturan mod.
+- **Pengatur kecepatan.** Preset 0.25x, 0.5x, 1x, 2x, 3x, dan 5x, ditambah penyesuaian halus (-0.5, -0.1, +0.1, +0.5).
+- **Rekam dan putar macro.** Perekaman berbasis frame pada 240 TPS. Format keluaran GDR2, sama dengan yang dipakai
+  banyak bot lain.
+- **Penyimpanan otomatis dengan nama terstruktur.** Rekaman disimpan sebagai `<ID level>_<nama level>.gdr2`.
+  Level yang belum diunggah memakai awalan `local`. Jika nama sudah ada, ditambahkan nomor urut sehingga
+  rekaman lama tidak tertimpa.
+- **Pengelola file macro.** Daftar file di folder macros ditampilkan langsung di menu: klik nama untuk memuat,
+  atau gunakan tombol Hapus (dengan konfirmasi) untuk menghapusnya.
+- **Muat dari berbagai format.** GDR2/GDR (biner maupun JSON) dan file `.zbf` dari zBot. Macro yang tidak
+  direkam pada 240 TPS dikonversi otomatis, dengan peringatan di menu.
+- **Safe mode.** Selama kecepatan bukan 1.0 atau macro sedang diputar, level ditandai sebagai test mode,
+  sehingga progres, persentase, dan completion tidak tersimpan maupun terkirim.
+
+## Instalasi
+
+1. Unduh file `namakamu.gdspeedmacro.geode` dari artifact **Build Output** pada run GitHub Actions terbaru.
+2. Tutup Geometry Dash.
+3. Salin file tersebut ke `%localappdata%\GeometryDash\geode\mods`
+   (atau folder `geode\mods` di direktori instalasi Geometry Dash untuk versi Steam).
+4. Jalankan game dan pastikan **GD Speed Macro** muncul pada daftar mod Geode.
+
+## Penggunaan
+
+| Tindakan | Cara |
+| --- | --- |
+| Membuka atau menutup menu | Tekan `Y` di dalam level, atau klik **Tutup** |
+| Mengubah kecepatan | Klik preset atau tombol penyesuaian pada bagian Kecepatan |
+| Merekam | Klik **Rekam**. Level dimulai ulang dan perekaman berjalan dari awal |
+| Menghentikan dan menyimpan rekaman | Klik **Stop Rekam**, selesaikan level, atau keluar dari level |
+| Memutar macro | Muat macro (atau rekam), lalu klik **Putar**. Level dimulai ulang |
+| Memuat macro dari file | Klik nama file pada daftar, atau pilih file di Settings mod lalu klik **Dari Setting** |
+| Membuka folder macros | Klik **Folder** |
+| Menghapus macro | Klik **Hapus**, lalu klik **Yakin?** untuk mengonfirmasi |
+
+Folder macros berada di direktori penyimpanan mod (`geode\config\namakamu.gdspeedmacro\macros`).
+File apa pun dapat ditaruh di folder ini dan akan muncul pada daftar.
 
 ## Batasan
-- Hanya level klasik, mode normal (bukan practice), 240 TPS. Macro platformer / TPS lain ditolak.
-- Macro orang lain bisa meleset jika versi game, mod, atau random-nya berbeda.
-- Data tambahan khusus bot lain (misal koreksi posisi) dilewati; hanya input yang dipakai.
 
-## Build tanpa install apa-apa (lewat GitHub Actions)
-1. Buat akun GitHub, buat repository baru (boleh private), upload semua isi folder ini
-   (pastikan folder .github ikut ter-upload).
-2. Buka tab Actions di repository, tunggu workflow "Build Geode Mod" selesai (hijau).
-3. Buka run tersebut, download artifact "Build Output", ekstrak, ambil file .geode.
-4. Salin file .geode ke GeometryDash/geode/mods lalu restart game.
-Kalau workflow merah, buka log-nya dan kirim pesan error ke Claude.
+- Hanya level klasik, mode normal (bukan practice), dan 240 TPS. Macro platformer ditolak.
+- Konversi dari TPS lain (misalnya 360 FPS pada `.zbf`) menggeser timing dan mengubah perilaku fisika,
+  sehingga hasilnya bisa meleset, terutama pada level yang menuntut presisi tinggi. Untuk macro seperti itu,
+  gunakan bot yang memutarnya pada TPS aslinya.
+- Macro dari bot lain dapat meleset bila versi game, mod, atau seed acak berbeda.
+- Data tambahan khusus bot lain (misalnya koreksi posisi) tidak dipakai. Hanya input yang diputar ulang.
+- Hotkey hanya tersedia di Windows.
+
+## Build
+
+Proyek ini dibangun melalui GitHub Actions (`.github/workflows/build.yml`) menggunakan
+`geode-sdk/build-geode-mod`. Versi SDK pada workflow harus sama dengan nilai `geode` di `mod.json`.
+
+Untuk build lokal: pasang Geode CLI dan SDK, lalu jalankan `geode build` di folder proyek.
