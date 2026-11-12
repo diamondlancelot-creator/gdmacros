@@ -375,6 +375,7 @@ Box* makeBox(CCSize size, ccColor3B col, GLubyte opacity = 255) {
 class MacroMenu : public CCLayer {
 protected:
     enum class Tab { Speed = 0, Macro = 1, Files = 2, Options = 3 };
+    enum class Style { Primary, Secondary, Danger };
 
     struct Btn {
         CCNode* node;
@@ -389,6 +390,8 @@ protected:
     CCLabelBMFont* m_speedNote = nullptr;
     CCLayerColor* m_fill = nullptr;
     CCNode* m_knob = nullptr;
+    Box* m_pillBox = nullptr;
+    CCLabelBMFont* m_pillText = nullptr;
     int m_pressed = -1;
     int m_page = 0;
     Tab m_tab = Tab::Speed;
@@ -400,30 +403,35 @@ protected:
     static constexpr float kTrackL = -92.f;
     static constexpr float kTrackR = 184.f;
     static constexpr float kTrackY = 17.f;
+    static constexpr char const* kBody = "chatFont.fnt";
+    static constexpr char const* kHead = "bigFont.fnt";
 
-    // Palette: gold / orange / cyan on deep navy
+    // Palette: deep navy surfaces, one blue accent, soft status colors
     static inline const ccColor3B kWhite{255, 255, 255};
-    static inline const ccColor3B kGold{255, 200, 40};
-    static inline const ccColor3B kOrange{255, 140, 20};
-    static inline const ccColor3B kCyan{40, 225, 255};
-    static inline const ccColor3B kDark{18, 20, 36};
-    static inline const ccColor3B kBg{15, 17, 38};
-    static inline const ccColor3B kBar{24, 27, 58};
-    static inline const ccColor3B kSide{21, 24, 50};
-    static inline const ccColor3B kCard{27, 31, 64};
-    static inline const ccColor3B kBtn{46, 52, 100};
-    static inline const ccColor3B kOff{62, 66, 108};
-    static inline const ccColor3B kMuted{150, 156, 195};
-    static inline const ccColor3B kGood{110, 255, 160};
-    static inline const ccColor3B kWarn{255, 190, 70};
-    static inline const ccColor3B kBad{255, 100, 100};
+    static inline const ccColor3B kText{228, 234, 245};
+    static inline const ccColor3B kMuted{132, 147, 178};
+    static inline const ccColor3B kLabel{96, 165, 250};
+    static inline const ccColor3B kAccent{59, 130, 246};
+    static inline const ccColor3B kBg{11, 18, 32};
+    static inline const ccColor3B kBar{15, 23, 42};
+    static inline const ccColor3B kSide{13, 20, 37};
+    static inline const ccColor3B kCard{17, 27, 46};
+    static inline const ccColor3B kBorder{32, 45, 72};
+    static inline const ccColor3B kBtn{24, 36, 60};
+    static inline const ccColor3B kSel{26, 50, 94};
+    static inline const ccColor3B kOff{51, 65, 85};
+    static inline const ccColor3B kTrack{36, 48, 76};
+    static inline const ccColor3B kGood{52, 211, 153};
+    static inline const ccColor3B kWarn{251, 191, 36};
+    static inline const ccColor3B kBad{248, 113, 113};
+    static inline const ccColor3B kDanger{220, 70, 80};
 
     bool init() override {
         if (!CCLayer::init()) return false;
         this->setTouchEnabled(true);
 
-        auto dim = CCLayerColor::create(ccColor4B{0, 0, 0, 0});
-        dim->runAction(CCFadeTo::create(0.2f, 170));
+        auto dim = CCLayerColor::create(ccColor4B{2, 6, 16, 0});
+        dim->runAction(CCFadeTo::create(0.2f, 185));
         this->addChild(dim, 0);
 
         auto win = CCDirector::get()->getWinSize();
@@ -433,7 +441,7 @@ protected:
 
         this->rebuild(true);
 
-        m_root->setScale(0.9f);
+        m_root->setScale(0.92f);
         m_root->runAction(CCEaseBackOut::create(CCScaleTo::create(0.22f, 1.f)));
         return true;
     }
@@ -450,34 +458,69 @@ protected:
         return b;
     }
 
-    CCLabelBMFont* addText(std::string const& text, CCPoint pos, float scale, ccColor3B col = kWhite,
-                           float anchorX = 0.f, char const* font = "bigFont.fnt") {
+    // Flat rectangle (square corners). pos is the bottom-left corner.
+    CCLayerColor* addRect(CCPoint pos, CCSize size, ccColor3B col, int z = 1) {
+        auto r = CCLayerColor::create(ccColor4B{col.r, col.g, col.b, 255}, size.width, size.height);
+        r->setPosition(pos);
+        m_cur->addChild(r, z);
+        return r;
+    }
+
+    void addCard(CCPoint c, CCSize s) {
+        addBox(c, {s.width + 2.f, s.height + 2.f}, kBorder, 255, 0);
+        addBox(c, s, kCard, 255, 0);
+    }
+
+    CCLabelBMFont* addText(std::string const& text, CCPoint pos, float scale, ccColor3B col = kText,
+                           float anchorX = 0.f, char const* font = kBody, float maxW = 0.f) {
         auto lbl = CCLabelBMFont::create(text.c_str(), font);
         lbl->setAnchorPoint({anchorX, 0.5f});
-        lbl->setScale(scale);
-        lbl->setPosition(pos);
         lbl->setColor(col);
+        lbl->setPosition(pos);
+        if (maxW > 0.f) lbl->limitLabelWidth(maxW, scale, 0.12f);
+        else lbl->setScale(scale);
         m_cur->addChild(lbl, 4);
         return lbl;
     }
 
-    Box* addBtn(std::string const& text, CCPoint pos, CCSize size, ccColor3B col, ccColor3B textCol, float textScale,
-                std::function<void()> cb) {
-        auto b = makeBox(size, col);
+    CCLabelBMFont* addSection(std::string const& text, CCPoint pos) {
+        return addText(text, pos, 0.24f, kLabel, 0.f, kHead);
+    }
+
+    Box* addBtn(std::string const& text, CCPoint pos, CCSize size, Style st, std::function<void()> cb,
+                float scale = 0.7f) {
+        ccColor3B outer = kBorder;
+        ccColor3B textCol = kText;
+        bool hasInner = true;
+        if (st == Style::Primary) {
+            outer = kAccent;
+            textCol = kWhite;
+            hasInner = false;
+        } else if (st == Style::Danger) {
+            outer = kDanger;
+            textCol = kWhite;
+            hasInner = false;
+        }
+        auto b = makeBox(size, outer);
         b->setPosition(pos);
         m_cur->addChild(b, 2);
-        auto lbl = CCLabelBMFont::create(text.c_str(), "bigFont.fnt");
-        lbl->setScale(textScale);
+        if (hasInner) {
+            auto in = makeBox({size.width - 2.f, size.height - 2.f}, kBtn);
+            in->setPosition({size.width / 2.f, size.height / 2.f});
+            b->addChild(in, 1);
+        }
+        auto lbl = CCLabelBMFont::create(text.c_str(), kBody);
+        lbl->limitLabelWidth(size.width - 10.f, scale, 0.12f);
         lbl->setColor(textCol);
         lbl->setPosition({size.width / 2.f, size.height / 2.f});
-        b->addChild(lbl, 1);
+        b->addChild(lbl, 2);
         m_btns.push_back({b, 1.f, std::move(cb)});
         return b;
     }
 
     void addToggle(CCPoint pos, std::function<bool()> get, std::function<void(bool)> set) {
         bool on = get();
-        auto pill = makeBox({42.f, 22.f}, on ? kCyan : kOff);
+        auto pill = makeBox({42.f, 22.f}, on ? kAccent : kOff);
         pill->setPosition(pos);
         m_cur->addChild(pill, 2);
         auto knob = makeBox({18.f, 18.f}, kWhite);
@@ -486,7 +529,7 @@ protected:
         m_btns.push_back({pill, 1.f, [pill, knob, get, set]() {
                               bool next = !get();
                               set(next);
-                              ccColor3B c = next ? kCyan : kOff;
+                              ccColor3B c = next ? kAccent : kOff;
                               pill->stopAllActions();
                               pill->setScale(1.f);
                               pill->runAction(CCTintTo::create(0.12f, c.r, c.g, c.b));
@@ -497,41 +540,63 @@ protected:
     }
 
     // ----- Layout -----
+    void updateSafePill() {
+        if (!m_pillBox || !m_pillText) return;
+        bool on = safeMode();
+        m_pillBox->setColor(on ? ccColor3B{16, 58, 46} : ccColor3B{76, 46, 14});
+        m_pillText->setString(on ? "SAFE MODE ON" : "SAFE MODE OFF");
+        m_pillText->limitLabelWidth(84.f, 0.52f, 0.12f);
+        m_pillText->setColor(on ? kGood : kWarn);
+    }
+
     void buildFrame() {
         m_cur = m_root;
-        addBox({0.f, -3.f}, {448.f, 278.f}, {0, 0, 0}, 90, 0);
-        addBox({0.f, 0.f}, {440.f, 270.f}, kBg, 250, 0);
-        addBox({0.f, 119.f}, {432.f, 28.f}, kBar, 255, 0);
+        addBox({0.f, -4.f}, {450.f, 280.f}, {0, 0, 0}, 110, 0);   // soft shadow
+        addBox({0.f, 0.f}, {442.f, 272.f}, kBorder, 255, 0);      // 1px border
+        addBox({0.f, 0.f}, {440.f, 270.f}, kBg, 255, 0);          // window body
 
-        auto accent = CCLayerGradient::create(ccColor4B{255, 200, 40, 255}, ccColor4B{255, 120, 20, 255});
-        accent->setContentSize({432.f, 2.f});
-        accent->setVector({1.f, 0.f});
-        accent->setPosition({-216.f, 104.f});
-        m_root->addChild(accent, 1);
+        // header bar: rounded top, flat bottom edge
+        addBox({0.f, 120.f}, {436.f, 28.f}, kBar, 255, 0);
+        addRect({-218.f, 105.f}, {436.f, 16.f}, kBar, 0);
+        addRect({-218.f, 104.f}, {436.f, 1.f}, kBorder, 1);
 
-        addText("REPLAY TOOLS", {-206.f, 119.f}, 0.5f, kGold);
-        addBtn("X", {198.f, 119.f}, {28.f, 20.f}, ccColor3B{190, 55, 70}, kWhite, 0.4f, [this]() { this->close(); });
+        addRect({-212.f, 116.f}, {8.f, 8.f}, kAccent, 2);
+        addText("Replay Tools", {-198.f, 120.f}, 0.42f, kWhite, 0.f, kHead);
+
+        m_pillBox = addBox({126.f, 120.f}, {92.f, 18.f}, kBorder, 255, 1);
+        m_pillText = addText("", {126.f, 120.f}, 0.52f, kGood, 0.5f);
+        updateSafePill();
+
+        addBtn("X", {198.f, 120.f}, {26.f, 18.f}, Style::Secondary, [this]() { this->close(); }, 0.7f);
     }
 
     void buildSidebar() {
         m_cur = m_root;
-        addBox({-170.f, -13.f}, {92.f, 228.f}, kSide, 255, 0);
+        addRect({-214.f, -129.f}, {90.f, 233.f}, kSide, 0);
+        addRect({-124.f, -129.f}, {1.f, 233.f}, kBorder, 1);
+
         char const* names[] = {"Speed", "Macro", "Files", "Options"};
         for (int i = 0; i < 4; i++) {
             bool sel = static_cast<int>(m_tab) == i;
-            addBtn(names[i], {-170.f, 82.f - i * 36.f}, {80.f, 28.f}, sel ? kGold : kBtn, sel ? kDark : kWhite, 0.38f,
-                   [this, i]() {
-                       if (static_cast<int>(m_tab) != i) {
-                           m_confirm.clear();
-                           m_tab = static_cast<Tab>(i);
-                           this->rebuild(true);
-                       }
-                   });
+            float y = 78.f - i * 32.f;
+            auto b = makeBox({82.f, 28.f}, kSel, sel ? 255 : 0);
+            b->setPosition({-169.f, y});
+            m_cur->addChild(b, 2);
+            m_btns.push_back({b, 1.f, [this, i]() {
+                                  if (static_cast<int>(m_tab) != i) {
+                                      m_confirm.clear();
+                                      m_tab = static_cast<Tab>(i);
+                                      this->rebuild(true);
+                                  }
+                              }});
+            if (sel) addRect({-210.f, y - 10.f}, {3.f, 20.f}, kAccent, 3);
+            addText(names[i], {-196.f, y}, 0.8f, sel ? kWhite : kMuted);
         }
+
         std::string key = Mod::get()->getSettingValue<std::string>("menu-key");
         if (key.empty()) key = "Y";
         key = std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(key[0]))));
-        addText("Hotkey: " + key, {-170.f, -118.f}, 0.26f, kMuted, 0.5f);
+        addText("Menu key: " + key, {-169.f, -116.f}, 0.55f, kMuted, 0.5f);
     }
 
     void rebuild(bool animate = false) {
@@ -543,6 +608,8 @@ protected:
         m_fill = nullptr;
         m_knob = nullptr;
         m_content = nullptr;
+        m_pillBox = nullptr;
+        m_pillText = nullptr;
         m_root->removeAllChildrenWithCleanup(true);
 
         buildFrame();
@@ -571,7 +638,7 @@ protected:
         bool normal = std::abs(sp - 1.0) <= 0.001;
         if (m_speedLabel) {
             m_speedLabel->setString(fmt::format("{:.2f}x", sp).c_str());
-            m_speedLabel->setColor(normal ? kCyan : kGold);
+            m_speedLabel->setColor(normal ? kText : kLabel);
         }
         if (m_speedNote) {
             if (normal) {
@@ -581,9 +648,10 @@ protected:
                 m_speedNote->setString("Safe mode: progress will not be saved");
                 m_speedNote->setColor(kWarn);
             } else {
-                m_speedNote->setString("Safe mode OFF: progress may be saved");
+                m_speedNote->setString("Safe mode is OFF: progress may be saved");
                 m_speedNote->setColor(kBad);
             }
+            m_speedNote->limitLabelWidth(250.f, 0.55f, 0.12f);
         }
         float k = static_cast<float>((sp - 0.1) / 4.9);
         float x = kTrackL + std::clamp(k, 0.f, 1.f) * (kTrackR - kTrackL);
@@ -592,46 +660,48 @@ protected:
     }
 
     void buildSpeedTab() {
-        // Readout card
-        addBox({48.f, 68.f}, {324.f, 62.f}, kCard, 255, 0);
-        addText("GAME SPEED", {-106.f, 88.f}, 0.3f, kGold);
-        m_speedLabel = addText("", {206.f, 72.f}, 0.85f, kCyan, 1.f);
-        m_speedNote = addText("", {-106.f, 52.f}, 0.24f, kMuted);
+        // Readout
+        addCard({48.f, 68.f}, {324.f, 62.f});
+        addSection("GAME SPEED", {-106.f, 88.f});
+        m_speedLabel = addText("", {202.f, 72.f}, 0.85f, kText, 1.f, kHead);
+        m_speedNote = addText("", {-106.f, 52.f}, 0.55f, kMuted, 0.f, kBody, 250.f);
 
-        // Slider card
-        addBox({48.f, 10.f}, {324.f, 48.f}, kCard, 255, 0);
-        auto track = CCLayerColor::create(ccColor4B{58, 64, 112, 255}, kTrackR - kTrackL, 6.f);
-        track->setPosition({kTrackL, kTrackY - 3.f});
-        m_cur->addChild(track, 1);
-        m_fill = CCLayerColor::create(ccColor4B{255, 190, 40, 255}, 10.f, 6.f);
-        m_fill->setPosition({kTrackL, kTrackY - 3.f});
-        m_cur->addChild(m_fill, 2);
-        auto knob = makeBox({22.f, 22.f}, kGold);
+        // Slider
+        addCard({48.f, 10.f}, {324.f, 48.f});
+        addRect({kTrackL, kTrackY - 3.f}, {kTrackR - kTrackL, 6.f}, kTrack, 1);
+        m_fill = addRect({kTrackL, kTrackY - 3.f}, {10.f, 6.f}, kAccent, 2);
+        auto knob = makeBox({22.f, 22.f}, kWhite);
         knob->setPosition({kTrackL, kTrackY});
+        auto ring = makeBox({12.f, 12.f}, kAccent);
+        ring->setPosition({11.f, 11.f});
+        knob->addChild(ring, 1);
         m_cur->addChild(knob, 3);
         m_knob = knob;
-        addText("0.1x", {kTrackL, -4.f}, 0.22f, kMuted, 0.5f);
-        addText("5x", {kTrackR, -4.f}, 0.22f, kMuted, 0.5f);
+        addText("0.1x", {kTrackL, -4.f}, 0.5f, kMuted, 0.5f);
+        addText("5x", {kTrackR, -4.f}, 0.5f, kMuted, 0.5f);
 
-        // Presets + fine tune card
-        addBox({48.f, -74.f}, {324.f, 114.f}, kCard, 255, 0);
-        addText("PRESETS", {-106.f, -29.f}, 0.26f, kGold);
+        // Presets + fine tune
+        addCard({48.f, -74.f}, {324.f, 114.f});
+        addSection("PRESETS", {-106.f, -29.f});
+        double cur = getSpeed();
         double presets[] = {0.25, 0.5, 1.0, 2.0, 3.0, 5.0};
         for (int i = 0; i < 6; i++) {
             double v = presets[i];
-            addBtn(fmt::format("{}x", v), {-82.f + i * 52.f, -52.f}, {46.f, 24.f}, kBtn, kWhite, 0.3f, [this, v]() {
-                setSpeed(v);
-                this->updateSpeedUI();
-            });
+            bool active = std::abs(cur - v) < 0.001;
+            addBtn(fmt::format("{}x", v), {-82.f + i * 52.f, -52.f}, {46.f, 24.f},
+                   active ? Style::Primary : Style::Secondary, [this, v]() {
+                       setSpeed(v);
+                       this->rebuild();
+                   });
         }
-        addText("FINE TUNE", {-106.f, -78.f}, 0.26f, kGold);
+        addSection("FINE TUNE", {-106.f, -78.f});
         double steps[] = {-0.5, -0.1, 0.1, 0.5};
         char const* stepNames[] = {"-0.5", "-0.1", "+0.1", "+0.5"};
         for (int i = 0; i < 4; i++) {
             double d = steps[i];
-            addBtn(stepNames[i], {-30.f + i * 52.f, -102.f}, {46.f, 24.f}, kBtn, kWhite, 0.3f, [this, d]() {
+            addBtn(stepNames[i], {-82.f + i * 52.f, -102.f}, {46.f, 24.f}, Style::Secondary, [this, d]() {
                 setSpeed(getSpeed() + d);
-                this->updateSpeedUI();
+                this->rebuild();
             });
         }
 
@@ -640,34 +710,48 @@ protected:
 
     // ----- Macro tab -----
     void buildMacroTab() {
-        addBox({48.f, 64.f}, {324.f, 72.f}, kCard, 255, 0);
-        addText("STATUS", {-106.f, 90.f}, 0.3f, kGold);
-        char const* state = g.recording ? "Recording" : (g.playing ? "Playing" : "Idle");
-        addText(state, {206.f, 90.f}, 0.34f, g.recording ? kBad : (g.playing ? kGood : kMuted), 1.f);
+        addCard({48.f, 64.f}, {324.f, 72.f});
+        addSection("STATUS", {-106.f, 90.f});
+
+        ccColor3B badgeBg = {30, 41, 66};
+        ccColor3B badgeFg = kMuted;
+        char const* state = "IDLE";
+        if (g.recording) {
+            state = "RECORDING";
+            badgeBg = {82, 28, 36};
+            badgeFg = kBad;
+        } else if (g.playing) {
+            state = "PLAYING";
+            badgeBg = {16, 58, 46};
+            badgeFg = kGood;
+        }
+        addBox({166.f, 90.f}, {76.f, 18.f}, badgeBg, 255, 1);
+        addText(state, {166.f, 90.f}, 0.52f, badgeFg, 0.5f, kBody, 68.f);
+
         if (g.loadedName.empty()) {
-            addText("No macro loaded", {-106.f, 68.f}, 0.34f, kMuted);
+            addText("No macro loaded", {-106.f, 68.f}, 0.8f, kMuted, 0.f, kBody, 300.f);
         } else {
-            addText(truncUtf8(g.loadedName, 30), {-106.f, 68.f}, 0.32f, kWhite);
+            addText(truncUtf8(g.loadedName, 36), {-106.f, 68.f}, 0.8f, kText, 0.f, kBody, 300.f);
         }
         addText(fmt::format("{} inputs   |   frame {}   |   input {}/{}", g.events.size(), g.frame, g.cursor,
                             g.events.size()),
-                {-106.f, 50.f}, 0.22f, kMuted);
-        if (!g.loadedNote.empty()) addText(g.loadedNote, {-106.f, 38.f}, 0.2f, kWarn);
+                {-106.f, 50.f}, 0.5f, kMuted, 0.f, kBody, 300.f);
+        if (!g.loadedNote.empty()) addText(g.loadedNote, {-106.f, 38.f}, 0.48f, kWarn, 0.f, kBody, 300.f);
 
-        addBox({48.f, -8.f}, {324.f, 56.f}, kCard, 255, 0);
-        addBtn(g.recording ? "Stop" : "Record", {-56.f, -8.f}, {92.f, 30.f}, g.recording ? ccColor3B{190, 55, 70} : kGold,
-               g.recording ? kWhite : kDark, 0.38f, [this]() { onRecord(); });
-        addBtn(g.playing ? "Stop" : "Play", {48.f, -8.f}, {92.f, 30.f}, g.playing ? ccColor3B{190, 55, 70} : kCyan,
-               g.playing ? kWhite : kDark, 0.38f, [this]() { onPlay(); });
-        addBtn("Save", {152.f, -8.f}, {92.f, 30.f}, kBtn, kWhite, 0.38f, [this]() {
+        addCard({48.f, -8.f}, {324.f, 56.f});
+        addBtn(g.recording ? "Stop" : "Record", {-56.f, -8.f}, {92.f, 30.f},
+               g.recording ? Style::Danger : Style::Primary, [this]() { onRecord(); }, 0.8f);
+        addBtn(g.playing ? "Stop" : "Play", {48.f, -8.f}, {92.f, 30.f}, g.playing ? Style::Danger : Style::Secondary,
+               [this]() { onPlay(); }, 0.8f);
+        addBtn("Save", {152.f, -8.f}, {92.f, 30.f}, Style::Secondary, [this]() {
             if (auto pl = PlayLayer::get()) saveMacro(pl);
             this->rebuild();
-        });
+        }, 0.8f);
 
-        addBox({48.f, -76.f}, {324.f, 70.f}, kCard, 255, 0);
-        addText("Records at 240 TPS (GDR2 format).", {-106.f, -58.f}, 0.24f, kMuted);
-        addText("Classic levels and normal mode only.", {-106.f, -74.f}, 0.24f, kMuted);
-        addText("Playback always starts from the beginning.", {-106.f, -90.f}, 0.24f, kMuted);
+        addCard({48.f, -76.f}, {324.f, 70.f});
+        addText("Records at 240 TPS (GDR2 format).", {-106.f, -58.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
+        addText("Classic levels and normal mode only.", {-106.f, -74.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
+        addText("Playback always starts from the beginning.", {-106.f, -90.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
     }
 
     // ----- Files tab -----
@@ -676,30 +760,30 @@ protected:
         int pages = std::max(1, static_cast<int>((files.size() + kPerPage - 1) / kPerPage));
         m_page = std::clamp(m_page, 0, pages - 1);
 
-        addText("MACROS", {-106.f, 94.f}, 0.3f, kGold);
-        addText(fmt::format("{} files   |   page {}/{}", files.size(), m_page + 1, pages), {206.f, 94.f}, 0.24f, kMuted,
+        addSection("MACROS", {-106.f, 94.f});
+        addText(fmt::format("{} files   |   page {}/{}", files.size(), m_page + 1, pages), {208.f, 94.f}, 0.5f, kMuted,
                 1.f);
 
         if (files.empty()) {
-            addBox({48.f, 40.f}, {324.f, 80.f}, kCard, 255, 0);
-            addText("No macros yet.", {48.f, 50.f}, 0.36f, kWhite, 0.5f);
-            addText("Record one, or put files in the macros folder.", {48.f, 30.f}, 0.24f, kMuted, 0.5f);
+            addCard({48.f, 40.f}, {324.f, 80.f});
+            addText("No macros yet", {48.f, 50.f}, 0.85f, kText, 0.5f);
+            addText("Record one, or put files in the macros folder.", {48.f, 30.f}, 0.55f, kMuted, 0.5f, kBody, 300.f);
         }
         for (int i = 0; i < kPerPage; i++) {
             size_t idx = static_cast<size_t>(m_page) * kPerPage + i;
             if (idx >= files.size()) break;
             auto path = files[idx];
             float y = 66.f - i * 34.f;
-            addBox({48.f, y}, {324.f, 30.f}, kCard, 255, 0);
-            addText(truncUtf8(nameOf(path), 26), {-102.f, y}, 0.28f, kWhite);
-            addBtn("Load", {128.f, y}, {48.f, 22.f}, kCyan, kDark, 0.3f, [this, path]() {
+            addCard({48.f, y}, {324.f, 30.f});
+            addText(truncUtf8(nameOf(path), 40), {-104.f, y}, 0.7f, kText, 0.f, kBody, 200.f);
+            addBtn("Load", {128.f, y}, {48.f, 22.f}, Style::Primary, [this, path]() {
                 m_confirm.clear();
                 loadMacro(path);
                 this->rebuild();
             });
             bool armed = !m_confirm.empty() && m_confirm == path;
-            addBtn(armed ? "Sure?" : "Delete", {182.f, y}, {52.f, 22.f}, armed ? ccColor3B{190, 55, 70} : kBtn, kWhite,
-                   0.28f, [this, path, armed]() {
+            addBtn(armed ? "Sure?" : "Delete", {182.f, y}, {52.f, 22.f}, armed ? Style::Danger : Style::Secondary,
+                   [this, path, armed]() {
                        if (armed) {
                            std::error_code ec;
                            std::filesystem::remove(path, ec);
@@ -714,22 +798,22 @@ protected:
         }
 
         float by = -106.f;
-        addBtn("<", {-98.f, by}, {30.f, 24.f}, kBtn, kWhite, 0.4f, [this]() {
+        addBtn("<", {-98.f, by}, {30.f, 24.f}, Style::Secondary, [this]() {
             m_confirm.clear();
             m_page--;
             this->rebuild();
-        });
-        addBtn(">", {-62.f, by}, {30.f, 24.f}, kBtn, kWhite, 0.4f, [this]() {
+        }, 0.8f);
+        addBtn(">", {-62.f, by}, {30.f, 24.f}, Style::Secondary, [this]() {
             m_confirm.clear();
             m_page++;
             this->rebuild();
-        });
-        addBtn("Open Folder", {20.f, by}, {96.f, 24.f}, kBtn, kWhite, 0.28f, []() {
+        }, 0.8f);
+        addBtn("Open Folder", {20.f, by}, {96.f, 24.f}, Style::Secondary, []() {
             std::error_code ec;
             std::filesystem::create_directories(macrosDir(), ec);
             (void)geode::utils::file::openFolder(macrosDir());
         });
-        addBtn("From Settings", {138.f, by}, {108.f, 24.f}, kGold, kDark, 0.26f, [this]() {
+        addBtn("From Settings", {138.f, by}, {108.f, 24.f}, Style::Primary, [this]() {
             auto path = Mod::get()->getSettingValue<std::filesystem::path>("macro-file");
             if (path.empty()) {
                 notify("Pick a file in the mod settings (Macro file) first", NotificationIcon::Warning);
@@ -743,25 +827,27 @@ protected:
 
     // ----- Options tab -----
     void buildOptionsTab() {
-        addBox({48.f, 66.f}, {324.f, 60.f}, kCard, 255, 0);
-        addText("Safe Mode", {-106.f, 80.f}, 0.4f, kWhite);
-        addText("Marks the level as test mode so progress is not saved.", {-106.f, 58.f}, 0.2f, kMuted);
+        addCard({48.f, 66.f}, {324.f, 60.f});
+        addText("Safe Mode", {-106.f, 80.f}, 0.9f, kText);
+        addText("Marks the level as test mode so progress is not saved.", {-106.f, 58.f}, 0.5f, kMuted, 0.f, kBody,
+                250.f);
         addToggle({166.f, 68.f}, []() { return safeMode(); }, [this](bool v) {
             Mod::get()->setSettingValue<bool>("safe-mode", v);
+            this->updateSafePill();
             if (!v) notify("Safe mode off: progress and completions can be saved", NotificationIcon::Warning);
         });
 
-        addBox({48.f, -2.f}, {324.f, 60.f}, kCard, 255, 0);
-        addText("No Clip", {-106.f, 12.f}, 0.4f, kWhite);
-        addText("Ignore deaths. Resets when the game restarts.", {-106.f, -10.f}, 0.2f, kMuted);
+        addCard({48.f, -2.f}, {324.f, 60.f});
+        addText("No Clip", {-106.f, 12.f}, 0.9f, kText);
+        addText("Ignore deaths. Resets when the game restarts.", {-106.f, -10.f}, 0.5f, kMuted, 0.f, kBody, 250.f);
         addToggle({166.f, 0.f}, []() { return g.noclip; }, [](bool v) {
             g.noclip = v;
             notify(v ? "No Clip on" : "No Clip off");
         });
 
-        addBox({48.f, -66.f}, {324.f, 52.f}, kCard, 255, 0);
-        addText("Menu key and game speed can also be changed", {-106.f, -56.f}, 0.2f, kMuted);
-        addText("in the mod settings (Geode > Replay Tools).", {-106.f, -72.f}, 0.2f, kMuted);
+        addCard({48.f, -66.f}, {324.f, 52.f});
+        addText("Menu key and game speed can also be changed", {-106.f, -56.f}, 0.5f, kMuted, 0.f, kBody, 300.f);
+        addText("in the mod settings (Geode > Replay Tools).", {-106.f, -72.f}, 0.5f, kMuted, 0.f, kBody, 300.f);
     }
 
     // ----- Actions -----
@@ -864,7 +950,7 @@ public:
         if (m_pressed >= 0) {
             auto& b = m_btns[m_pressed];
             b.node->stopAllActions();
-            b.node->runAction(CCScaleTo::create(0.06f, b.baseScale * 0.94f));
+            b.node->runAction(CCScaleTo::create(0.06f, b.baseScale * 0.95f));
         } else if (inSliderArea(t)) {
             m_dragging = true;
             setSliderFromTouch(t);
@@ -881,6 +967,7 @@ public:
     void ccTouchEnded(CCTouch* t, CCEvent*) override {
         if (m_dragging) {
             m_dragging = false;
+            this->rebuild();  // refresh preset highlight
             return;
         }
         if (m_outside) {
