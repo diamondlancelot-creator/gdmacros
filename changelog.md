@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.4.0
+
+- Redesigned the menu: a tabbed window (Speed, Macro, Files, Options) with a dark navy theme and gold, orange and cyan accents
+- Added a draggable speed slider, with presets and fine-tune buttons
+- Added smooth open, tab-switch and button-press animations; click outside the window to close it
+- Added switch-style toggles for Safe Mode and No Clip
+- All in-game text and mod settings are now in English
+- Improved loading of macros recorded at other TPS (for example 360): duplicate events are removed and very short clicks are kept after conversion
+
 ## v1.3.1
 
 - Fixed a build error caused by invalid content at the top of `src/main.cpp`
