@@ -36,7 +36,7 @@ Copy `namakamu.replaytools.geode` to `%localappdata%\GeometryDash\geode\mods` an
 ## Notes
 
 - Disabling safe mode lets results from these features be saved and submitted, which may be flagged by the game's anti-cheat. Use at your own risk.
-- Classic levels, normal mode, and 240 TPS only. Macros recorded at other TPS values are converted and may be inaccurate.
+- Classic levels and 240 TPS only. Practice mode is supported: dying rewinds the macro to the last checkpoint. Macros recorded at other TPS values are converted and may be inaccurate.
 - Platformer macros are not supported.
 - The hotkey works on Windows only.
 
