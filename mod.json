@@ -6,7 +6,7 @@
 	},
 	"id": "namakamu.replaytools",
 	"name": "Replay Tools",
-	"version": "v1.4.0",
+	"version": "v1.4.1",
 	"developer": "namakamu",
 	"description": "In-game menu (hotkey Y) for speed control, macro recording/playback and No Clip. Safe mode is on by default.",
 	"settings": {
