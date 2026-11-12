@@ -7,7 +7,7 @@ Replay Tools adds a clean in-game menu to Geometry Dash. Press `Y` inside a leve
 - **Speed control:** choose a preset (0.25x, 0.5x, 1x, 2x, 3x, 5x) or adjust the speed in small steps with the `-` / `+` buttons.
 - **Macro recording and playback:** record your inputs at 240 TPS and replay them later. Macros use the GDR2 format, so they work with other bots.
 - **Macro import:** load GDR2/GDR files and zBot `.zbf` files. Macros made at a different TPS are converted to 240 TPS automatically.
-- **File manager:** browse, load, and delete your saved macros directly from the menu, or open the macros folder.
+- **File manager:** browse, load, and delete your saved macros directly from the menu, import a file with the **Import...** button (no need to leave the level), or open the macros folder.
 - **No Clip:** ignore deaths for practice and testing. It resets when you restart the game.
 
 ## Safe mode
@@ -27,4 +27,3 @@ You can turn safe mode off from the menu or the mod settings, but doing so lets 
 - **Safe mode:** on by default
 - **Menu key:** the key that opens the menu (default `Y`)
 - **Game speed:** 0.1x to 5.0x
-- **Macro file:** choose a file, then press **From Settings** in the menu to load it
