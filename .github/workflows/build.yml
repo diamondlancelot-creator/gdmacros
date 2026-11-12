@@ -17,7 +17,7 @@ jobs:
         uses: geode-sdk/build-geode-mod@main
         with:
           combine: true
-          sdk: latest
+          sdk: 5.11.2
 
   package:
     name: Package builds
