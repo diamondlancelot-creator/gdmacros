@@ -4,28 +4,28 @@
 		"win": "2.2081",
 		"android": "2.2081"
 	},
-	"id": "namakamu.gdspeedmacro",
-	"name": "GD Speed Macro",
-	"version": "v1.3.0",
+	"id": "namakamu.replaytools",
+	"name": "Replay Tools",
+	"version": "v1.4.0",
 	"developer": "namakamu",
-	"description": "Menu in-game (hotkey Y) untuk mengatur kecepatan, merekam dan memutar macro, serta mengaktifkan No Clip. Mendukung GDR2 dan .zbf (zBot). Rekaman disimpan otomatis dengan nama <ID level>_<nama level>. Safe mode (aktif secara default) mencegah progres tersimpan saat speed, macro, atau No Clip dipakai.",
+	"description": "In-game menu (hotkey Y) for speed control, macro recording/playback and No Clip. Safe mode is on by default.",
 	"settings": {
 		"safe-mode": {
 			"type": "bool",
 			"name": "Safe mode",
-			"description": "Bila aktif, level ditandai test mode saat speed diubah, macro diputar, atau No Clip menyala, sehingga progres dan completion tidak tersimpan atau terkirim. Dapat diubah juga dari menu mod.",
+			"description": "When enabled, the level is marked as test mode while speed is changed, a macro is playing, or No Clip is on, so progress and completions are not saved or submitted. Can also be toggled from the mod menu.",
 			"default": true
 		},
 		"menu-key": {
 			"type": "string",
-			"name": "Tombol menu",
-			"description": "Huruf atau angka untuk membuka menu mod di dalam level (default: Y).",
+			"name": "Menu key",
+			"description": "Letter or number that opens the mod menu inside a level (default: Y).",
 			"default": "Y"
 		},
 		"speed": {
 			"type": "float",
-			"name": "Kecepatan game",
-			"description": "1.0 = normal. Selain 1.0, progres level TIDAK disimpan (safe mode). Lebih mudah diatur lewat menu hotkey.",
+			"name": "Game speed",
+			"description": "1.0 is normal. Any other value stops progress from being saved while safe mode is on. Easier to adjust from the in-game menu.",
 			"default": 1.0,
 			"min": 0.1,
 			"max": 5.0,
@@ -36,8 +36,8 @@
 		},
 		"macro-file": {
 			"type": "file",
-			"name": "File macro untuk dimuat",
-			"description": "Pilih file macro apa saja, lalu tekan 'Dari Setting' di menu mod.",
+			"name": "Macro file to load",
+			"description": "Pick any macro file, then press 'From Settings' in the mod menu.",
 			"default": "",
 			"control": {
 				"dialog": "open",
@@ -46,7 +46,7 @@
 						"files": [
 							"*.*"
 						],
-						"description": "Semua file"
+						"description": "All files"
 					}
 				]
 			}
