@@ -6,9 +6,9 @@
 	},
 	"id": "namakamu.gdspeedmacro",
 	"name": "GD Speed Macro",
-	"version": "v1.1.0",
+	"version": "v1.2.0",
 	"developer": "namakamu",
-	"description": "Menu sendiri (hotkey Y) untuk speed + rekam/putar macro. Muat macro dari file apa saja (GDR2, zBot .zbf). Aman: progres level tidak tersimpan saat speed diubah / macro diputar.",
+	"description": "Menu in-game (hotkey Y) untuk mengatur kecepatan game serta merekam dan memutar macro. Mendukung GDR2 dan .zbf (zBot). Rekaman disimpan otomatis dengan nama <ID level>_<nama level>. Progres level tidak tersimpan saat speed diubah atau macro diputar.",
 	"settings": {
 		"menu-key": {
 			"type": "string",
@@ -37,7 +37,9 @@
 				"dialog": "open",
 				"filters": [
 					{
-						"files": ["*.*"],
+						"files": [
+							"*.*"
+						],
 						"description": "Semua file"
 					}
 				]
