@@ -19,10 +19,10 @@ Copy `namakamu.replaytools.geode` to `%localappdata%\GeometryDash\geode\mods` an
 ## Usage
 
 1. Enter a level and press `Y` to open the Replay Tools menu. The key can be changed in the mod settings.
-2. Pick a speed preset, or fine-tune it with the `-` / `+` buttons.
-3. Press **Record** to restart the level and record your inputs. Press **Stop Record** (or finish the level) to save the macro.
-4. Select a macro from the file list to load it, then press **Play** to replay it.
-5. Use **Folder** to open the macros folder, or **From Settings** to load a file chosen in the mod settings.
+2. On the **Speed** tab, drag the slider, pick a preset, or fine-tune with the `-` / `+` buttons.
+3. On the **Macro** tab, press **Record** to restart the level and record your inputs. Press **Stop** (or finish the level) to save the macro.
+4. On the **Files** tab, press **Load** next to a macro, then press **Play** on the **Macro** tab to replay it.
+5. Use **Open Folder** to open the macros folder, or **From Settings** to load a file chosen in the mod settings. Safe Mode and No Clip are on the **Options** tab.
 
 ## Settings
 
