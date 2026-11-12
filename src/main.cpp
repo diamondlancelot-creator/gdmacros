@@ -73,6 +73,7 @@ struct State {
     bool recording = false;
     bool playing = false;
     bool speedActive = false;
+    bool noclip = false;         // No Clip aktif (hanya selama sesi game, tidak disimpan)
     bool injecting = false;      // true saat macro sendiri yang menekan tombol (jangan diblok / direkam)
     uint64_t frame = 0;          // nomor langkah fisika sejak awal attempt
     std::vector<Ev> events;
@@ -286,6 +287,16 @@ void finishRecording(PlayLayer* pl) {
     saveMacro(pl);
 }
 
+// ---------- Safe mode ----------
+bool safeMode() {
+    return Mod::get()->getSettingValue<bool>("safe-mode");
+}
+
+// Level ditandai test mode bila safe mode aktif dan ada bantuan (macro, speed, atau no clip).
+bool needTestMode() {
+    return safeMode() && (g.playing || g.speedActive || g.noclip);
+}
+
 // ---------- Speed ----------
 double getSpeed() {
     return Mod::get()->getSettingValue<double>("speed");
@@ -409,20 +420,24 @@ protected:
             panel->setContentSize({420.f, 312.f});
             m_root->addChild(panel, 0);
         }
-        addLabel("GD Speed Macro", {0.f, 138.f}, 0.7f, 0.5f, "goldFont.fnt");
+        addLabel("GD Speed Macro", {0.f, 141.f}, 0.65f, 0.5f, "goldFont.fnt");
 
         // ----- Kartu: Kecepatan -----
-        addCard({0.f, 77.f}, {396.f, 72.f});
+        addCard({0.f, 92.f}, {396.f, 64.f});
         double sp = getSpeed();
         bool normal = std::abs(sp - 1.0) <= 0.001;
-        addLabel("KECEPATAN", {-188.f, 103.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
-        if (!normal) addLabel("progres tidak disimpan", {-110.f, 103.f}, 0.24f, 0.f, "bigFont.fnt", kWarn);
-        addLabel(fmt::format("{:.2f}x", sp), {188.f, 103.f}, 0.5f, 1.f, "bigFont.fnt", normal ? kGood : kWarn);
+        addLabel("KECEPATAN", {-188.f, 114.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
+        if (!normal) {
+            bool safe = safeMode();
+            addLabel(safe ? "progres tidak disimpan" : "safe mode mati: progres bisa tersimpan", {-110.f, 114.f}, 0.24f,
+                     0.f, "bigFont.fnt", safe ? kWarn : kBad);
+        }
+        addLabel(fmt::format("{:.2f}x", sp), {188.f, 114.f}, 0.5f, 1.f, "bigFont.fnt", normal ? kGood : kWarn);
 
         double presets[] = {0.25, 0.5, 1.0, 2.0, 3.0, 5.0};
         for (int i = 0; i < 6; i++) {
             double v = presets[i];
-            addButton(fmt::format("{}x", v), {-145.f + i * 58.f, 84.f}, 0.5f, [this, v]() {
+            addButton(fmt::format("{}x", v), {-145.f + i * 58.f, 96.f}, 0.5f, [this, v]() {
                 setSpeed(v);
                 this->rebuild();
             });
@@ -431,50 +446,67 @@ protected:
         char const* stepNames[] = {"-0.5", "-0.1", "+0.1", "+0.5"};
         for (int i = 0; i < 4; i++) {
             double d = steps[i];
-            addButton(stepNames[i], {-105.f + i * 70.f, 60.f}, 0.5f, [this, d]() {
+            addButton(stepNames[i], {-105.f + i * 70.f, 73.f}, 0.5f, [this, d]() {
                 setSpeed(getSpeed() + d);
                 this->rebuild();
             });
         }
 
         // ----- Kartu: Macro -----
-        addCard({0.f, 5.f}, {396.f, 62.f});
-        addLabel("MACRO", {-188.f, 27.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
+        addCard({0.f, 27.f}, {396.f, 58.f});
+        addLabel("MACRO", {-188.f, 48.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
         char const* state = g.recording ? "Merekam" : (g.playing ? "Memutar" : "Siap");
         addLabel(fmt::format("{}  |  frame {}  |  {}/{}", state, g.frame, g.cursor, g.events.size()),
-                 {188.f, 27.f}, 0.24f, 1.f, "bigFont.fnt", g.recording ? kBad : (g.playing ? kGood : kMuted));
+                 {188.f, 48.f}, 0.24f, 1.f, "bigFont.fnt", g.recording ? kBad : (g.playing ? kGood : kMuted));
         if (g.loadedName.empty()) {
-            addLabel("Belum ada macro dimuat", {-188.f, 13.f}, 0.32f, 0.f, "bigFont.fnt", kMuted);
+            addLabel("Belum ada macro dimuat", {-188.f, 35.f}, 0.32f, 0.f, "bigFont.fnt", kMuted);
         } else {
-            addLabel(fmt::format("{} ({} input)", truncUtf8(g.loadedName, 34), g.events.size()), {-188.f, 13.f}, 0.32f,
+            addLabel(fmt::format("{} ({} input)", truncUtf8(g.loadedName, 34), g.events.size()), {-188.f, 35.f}, 0.32f,
                      0.f);
         }
-        if (!g.loadedNote.empty()) addLabel(g.loadedNote, {-188.f, 3.f}, 0.22f, 0.f, "bigFont.fnt", kWarn);
+        if (!g.loadedNote.empty()) addLabel(g.loadedNote, {-188.f, 26.f}, 0.22f, 0.f, "bigFont.fnt", kWarn);
 
-        addButton(g.recording ? "Stop Rekam" : "Rekam", {-110.f, -12.f}, 0.55f, [this]() { onRecord(); });
-        addButton(g.playing ? "Stop Putar" : "Putar", {0.f, -12.f}, 0.55f, [this]() { onPlay(); });
-        addButton("Simpan", {110.f, -12.f}, 0.55f, [this]() {
+        addButton(g.recording ? "Stop Rekam" : "Rekam", {-110.f, 10.f}, 0.55f, [this]() { onRecord(); });
+        addButton(g.playing ? "Stop Putar" : "Putar", {0.f, 10.f}, 0.55f, [this]() { onPlay(); });
+        addButton("Simpan", {110.f, 10.f}, 0.55f, [this]() {
             if (auto pl = PlayLayer::get()) saveMacro(pl);
             this->rebuild();
         });
 
+        // ----- Kartu: Opsi -----
+        addCard({0.f, -20.f}, {396.f, 28.f});
+        bool safeNow = safeMode();
+        addButton(safeNow ? "Safe Mode: ON" : "Safe Mode: OFF", {-95.f, -20.f}, 0.5f, [this]() {
+            bool next = !safeMode();
+            Mod::get()->setSettingValue<bool>("safe-mode", next);
+            if (!next) {
+                notify("Safe mode mati: progres dan completion bisa tersimpan/terkirim", NotificationIcon::Warning);
+            }
+            this->rebuild();
+        });
+        addButton(g.noclip ? "No Clip: ON" : "No Clip: OFF", {95.f, -20.f}, 0.5f, [this]() {
+            g.noclip = !g.noclip;
+            notify(g.noclip ? "No Clip aktif" : "No Clip mati");
+            this->rebuild();
+        });
+
         // ----- Kartu: File macro -----
-        addCard({0.f, -81.f}, {396.f, 98.f});
+        addCard({0.f, -85.f}, {396.f, 94.f});
         auto files = listMacros();
         int pages = std::max(1, static_cast<int>((files.size() + kPerPage - 1) / kPerPage));
         m_page = std::clamp(m_page, 0, pages - 1);
-        addLabel("FILE MACRO", {-188.f, -43.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
-        addLabel(fmt::format("{} file  |  hal {}/{}", files.size(), m_page + 1, pages), {188.f, -43.f}, 0.24f, 1.f,
+        addLabel("FILE MACRO", {-188.f, -48.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
+        addLabel(fmt::format("{} file  |  hal {}/{}", files.size(), m_page + 1, pages), {188.f, -48.f}, 0.24f, 1.f,
                  "bigFont.fnt", kMuted);
         if (files.empty()) {
-            addLabel("Belum ada file. Rekam macro, atau taruh file di folder macros.", {0.f, -84.f}, 0.28f, 0.5f,
+            addLabel("Belum ada file. Rekam macro, atau taruh file di folder macros.", {0.f, -92.f}, 0.28f, 0.5f,
                      "bigFont.fnt", kMuted);
         }
         for (int i = 0; i < kPerPage; i++) {
             size_t idx = static_cast<size_t>(m_page) * kPerPage + i;
             if (idx >= files.size()) break;
             auto path = files[idx];
-            float y = -64.f - i * 22.f;
+            float y = -69.f - i * 22.f;
             addButton(truncUtf8(nameOf(path), 28), {-42.f, y}, 0.4f, [this, path]() {
                 m_confirm.clear();
                 loadMacro(path);
@@ -496,7 +528,7 @@ protected:
         }
 
         // ----- Baris bawah -----
-        float by = -143.f;
+        float by = -145.f;
         addButton("<", {-172.f, by}, 0.45f, [this]() {
             m_confirm.clear();
             m_page--;
@@ -695,7 +727,7 @@ class $modify(MacroBase, GJBaseGameLayer) {
                 }
             }
             // SAFE MODE: tandai sebagai test mode supaya tidak ada progres yang tersimpan
-            if (g.playing || g.speedActive) pl->m_isTestMode = true;
+            if (needTestMode()) pl->m_isTestMode = true;
         }
         GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
         if (mine && !isHalfTick) g.frame++;
@@ -713,6 +745,12 @@ class $modify(MacroBase, GJBaseGameLayer) {
 };
 
 class $modify(MacroPlay, PlayLayer) {
+    // No Clip: abaikan kematian, kecuali dari anticheat spike milik game
+    void destroyPlayer(PlayerObject* player, GameObject* object) {
+        if (g.noclip && object != m_anticheatSpike) return;
+        PlayLayer::destroyPlayer(player, object);
+    }
+
     void resetLevel() {
         PlayLayer::resetLevel();
         g.frame = 0;
@@ -724,7 +762,7 @@ class $modify(MacroPlay, PlayLayer) {
     }
 
     void levelComplete() {
-        if (g.playing || g.speedActive) m_isTestMode = true;  // safe mode
+        if (needTestMode()) m_isTestMode = true;  // safe mode
         bool wasRecording = g.recording;
         PlayLayer::levelComplete();
         if (wasRecording) finishRecording(this);
