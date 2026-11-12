@@ -19,7 +19,6 @@ You can turn safe mode off from the menu or the mod settings, but doing so lets 
 ## Limitations
 
 - Classic levels only (no platformer macros)
-- Normal mode only (no practice mode recording or playback)
 - 240 TPS is the native format; other TPS values are converted and may be less accurate
 - The menu hotkey works on Windows only
 
