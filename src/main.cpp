@@ -32,6 +32,7 @@
 #include <cstring>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <set>
 #include <string_view>
 #include <string>
@@ -251,13 +252,36 @@ bool loadMacro(std::filesystem::path const& path) {
         return false;
     }
 
-    std::string note;
+        std::string note;
     if (std::abs(srcFps - 240.0) > 0.01) {
         for (auto& e : evs) e.frame = convertFrame(e.frame, srcFps);
+
+        // Rapikan setelah konversi: buang event ganda, dan pastikan klik singkat
+        // (tekan lalu lepas di frame yang sama) tidak hilang.
+        struct Key {
+            bool down = false;
+            uint64_t downFrame = 0;
+        };
+        std::map<std::pair<uint8_t, bool>, Key> state;
+        std::vector<Ev> clean;
+        for (auto e : evs) {
+            auto& st = state[{e.button, e.p2}];
+            if (e.down) {
+                if (st.down) continue;  // sudah ditekan, abaikan
+                st.down = true;
+                st.downFrame = e.frame;
+            } else {
+                if (!st.down) continue;  // belum ditekan, abaikan
+                if (e.frame <= st.downFrame) e.frame = st.downFrame + 1;  // jaga klik singkat
+                st.down = false;
+            }
+            clean.push_back(e);
+        }
+        evs = std::move(clean);
+
         note = fmt::format("{:.0f} TPS dikonversi ke 240, bisa kurang akurat", srcFps);
     }
     std::stable_sort(evs.begin(), evs.end(), [](Ev const& a, Ev const& b) { return a.frame < b.frame; });
-
     g.events = std::move(evs);
     g.loadedName = nameOf(path);
     g.loadedNote = note;
