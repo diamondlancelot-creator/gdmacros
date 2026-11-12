@@ -21,4 +21,9 @@ add_subdirectory($ENV{GEODE_SDK} ${CMAKE_CURRENT_BINARY_DIR}/geode)
 CPMAddPackage("gh:maxnut/GDReplayFormat#gdr2")
 target_link_libraries(${PROJECT_NAME} libGDR)
 
+# Native file dialog for the in-level Import button (Windows)
+if (WIN32)
+    target_link_libraries(${PROJECT_NAME} comdlg32)
+endif()
+
 setup_geode_mod(${PROJECT_NAME})
