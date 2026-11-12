@@ -183,7 +183,7 @@ class $modify(MacroScheduler, CCScheduler) {
 
 // ---------- Input: rekam / putar per langkah fisika ----------
 class $modify(MacroBase, GJBaseGameLayer) {
-    void processCommands(float dt) {
+        void processCommands(float dt, bool isHalfTick, bool isLastTick) {
         bool mine = isThisPlayLayer(this);
         if (mine) {
             auto pl = PlayLayer::get();
@@ -203,7 +203,7 @@ class $modify(MacroBase, GJBaseGameLayer) {
             // SAFE MODE: tandai sebagai test mode supaya tidak ada progres yang tersimpan
             if (g.playing || g.speedActive) pl->m_isTestMode = true;
         }
-        GJBaseGameLayer::processCommands(dt);
+                GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
         if (mine) g.frame++;
     }
 
