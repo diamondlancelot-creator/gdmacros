@@ -33,6 +33,7 @@
 #include <filesystem>
 #include <functional>
 #include <set>
+#include <string_view>
 #include <string>
 #include <utility>
 #include <vector>
@@ -72,6 +73,7 @@ struct State {
     bool recording = false;
     bool playing = false;
     bool speedActive = false;
+    bool injecting = false;      // true saat macro sendiri yang menekan tombol (jangan diblok / direkam)
     uint64_t frame = 0;          // nomor langkah fisika sejak awal attempt
     std::vector<Ev> events;
     size_t cursor = 0;
@@ -95,10 +97,44 @@ std::filesystem::path macrosDir() {
 
 std::string nameOf(std::filesystem::path const& p) {
     try {
-        return p.filename().string();
+        auto u = p.filename().u8string();
+        return std::string(reinterpret_cast<char const*>(u.data()), u.size());
     } catch (...) {
         return "(nama tidak valid)";
     }
+}
+
+std::filesystem::path pathFromUtf8(std::string const& s) {
+    std::u8string u(reinterpret_cast<char8_t const*>(s.data()), s.size());
+    return std::filesystem::path(u);
+}
+
+// Memotong string UTF-8 tanpa merusak karakter di tengah.
+std::string truncUtf8(std::string s, size_t maxBytes, bool dots = true) {
+    if (s.size() <= maxBytes) return s;
+    size_t cut = maxBytes;
+    while (cut > 0 && (static_cast<unsigned char>(s[cut]) & 0xC0) == 0x80) cut--;
+    s.resize(cut);
+    return dots ? s + "..." : s;
+}
+
+// Nama file yang aman di Windows: karakter terlarang diganti, spasi jadi garis bawah.
+std::string sanitizeFileName(std::string const& in) {
+    std::string out;
+    for (unsigned char c : in) {
+        if (c < 32 || std::string_view("<>:\"/\\|?*").find(static_cast<char>(c)) != std::string_view::npos) {
+            out += '_';
+        } else if (c == ' ') {
+            out += '_';
+        } else {
+            out += static_cast<char>(c);
+        }
+    }
+    while (!out.empty() && (out.back() == '_' || out.back() == '.')) out.pop_back();
+    out = truncUtf8(out, 40, false);
+    while (!out.empty() && (out.back() == '_' || out.back() == '.')) out.pop_back();
+    if (out.empty()) out = "Tanpa_Nama";
+    return out;
 }
 
 std::vector<uint8_t> buildReplay(PlayLayer* pl) {
@@ -125,10 +161,14 @@ void saveMacro(PlayLayer* pl) {
     auto dir = macrosDir();
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
-    auto stamp = std::chrono::duration_cast<std::chrono::seconds>(
-                     std::chrono::system_clock::now().time_since_epoch())
-                     .count();
-    auto path = dir / fmt::format("{}_{}.gdr2", static_cast<int>(pl->m_level->m_levelID.value()), stamp);
+    int levelId = static_cast<int>(pl->m_level->m_levelID.value());
+    std::string levelName = sanitizeFileName(static_cast<std::string>(pl->m_level->m_levelName));
+    std::string base = fmt::format("{}_{}", levelId > 0 ? std::to_string(levelId) : std::string("local"), levelName);
+    auto path = dir / pathFromUtf8(base + ".gdr2");
+    // Jika nama sudah dipakai, tambahkan nomor urut agar rekaman lama tidak tertimpa.
+    for (int n = 2; n < 1000 && std::filesystem::exists(path, ec); n++) {
+        path = dir / pathFromUtf8(fmt::format("{}_{}.gdr2", base, n));
+    }
     auto res = geode::utils::file::writeBinary(path, buildReplay(pl));
     if (!resultOk(res)) {
         notify("Gagal menyimpan macro", NotificationIcon::Error);
@@ -137,7 +177,7 @@ void saveMacro(PlayLayer* pl) {
     g.loadedName = nameOf(path);
     g.loadedNote.clear();
     notify("Tersimpan: " + nameOf(path), NotificationIcon::Success);
-    log::info("Macro disimpan di {}", path.string());
+    log::info("Macro disimpan: {}", nameOf(path));
 }
 
 // ---------- Pembaca format ----------
@@ -227,9 +267,11 @@ bool loadMacro(std::filesystem::path const& path) {
 
 void releaseHeld(PlayLayer* pl) {
     if (pl) {
+        g.injecting = true;
         for (auto const& [button, p2] : g.held) {
             pl->handleButton(false, button, !p2);
         }
+        g.injecting = false;
     }
     g.held.clear();
 }
@@ -291,15 +333,37 @@ protected:
         std::function<void()> cb;
     };
     std::vector<Btn> m_btns;
+    CCNode* m_root = nullptr;
     int m_pressed = -1;
     int m_page = 0;
+    std::filesystem::path m_confirm;  // file yang menunggu konfirmasi hapus
 
     static constexpr int kPerPage = 3;
+
+    static inline const ccColor3B kWhite{255, 255, 255};
+    static inline const ccColor3B kGold{255, 215, 100};
+    static inline const ccColor3B kMuted{165, 170, 180};
+    static inline const ccColor3B kGood{120, 255, 140};
+    static inline const ccColor3B kWarn{255, 200, 80};
+    static inline const ccColor3B kBad{255, 120, 110};
 
     bool init() override {
         if (!CCLayer::init()) return false;
         this->setTouchEnabled(true);
+
+        auto dim = CCLayerColor::create(ccColor4B{0, 0, 0, 160});
+        this->addChild(dim, 0);
+
+        auto win = CCDirector::get()->getWinSize();
+        m_root = CCNode::create();
+        m_root->setPosition({win.width / 2.f, win.height / 2.f});
+        this->addChild(m_root, 1);
+
         this->rebuild();
+
+        // animasi muncul singkat
+        m_root->setScale(0.85f);
+        m_root->runAction(CCEaseBackOut::create(CCScaleTo::create(0.18f, 1.f)));
         return true;
     }
 
@@ -307,48 +371,58 @@ protected:
         CCDirector::get()->getTouchDispatcher()->addTargetedDelegate(this, -500, true);
     }
 
-    void addLabel(std::string const& text, CCPoint pos, float scale, char const* font = "bigFont.fnt") {
+    void addLabel(std::string const& text, CCPoint pos, float scale, float anchorX = 0.5f,
+                  char const* font = "bigFont.fnt", ccColor3B color = kWhite) {
         auto lbl = CCLabelBMFont::create(text.c_str(), font);
+        lbl->setAnchorPoint({anchorX, 0.5f});
         lbl->setScale(scale);
         lbl->setPosition(pos);
-        this->addChild(lbl, 2);
+        lbl->setColor(color);
+        m_root->addChild(lbl, 3);
+    }
+
+    void addCard(CCPoint center, CCSize size) {
+        auto card = cocos2d::extension::CCScale9Sprite::create("square02b_001.png");
+        if (!card) return;
+        card->setContentSize(size);
+        card->setPosition(center);
+        card->setColor({0, 0, 0});
+        card->setOpacity(95);
+        m_root->addChild(card, 1);
     }
 
     void addButton(std::string const& text, CCPoint pos, float scale, std::function<void()> cb) {
         auto spr = ButtonSprite::create(text.c_str());
         spr->setScale(scale);
         spr->setPosition(pos);
-        this->addChild(spr, 2);
+        m_root->addChild(spr, 4);
         m_btns.push_back({spr, scale, std::move(cb)});
     }
 
     void rebuild() {
         m_btns.clear();
         m_pressed = -1;
-        this->removeAllChildrenWithCleanup(true);
+        m_root->removeAllChildrenWithCleanup(true);
 
-        auto win = CCDirector::get()->getWinSize();
-        float cx = win.width / 2.f, cy = win.height / 2.f;
+        // ----- Panel utama -----
+        if (auto panel = cocos2d::extension::CCScale9Sprite::create("GJ_square01.png")) {
+            panel->setContentSize({420.f, 312.f});
+            m_root->addChild(panel, 0);
+        }
+        addLabel("GD Speed Macro", {0.f, 138.f}, 0.7f, 0.5f, "goldFont.fnt");
 
-        auto dim = CCLayerColor::create(ccColor4B{0, 0, 0, 150});
-        this->addChild(dim, 0);
-
-        auto panel = cocos2d::extension::CCScale9Sprite::create("GJ_square01.png");
-        panel->setContentSize({390.f, 285.f});
-        panel->setPosition({cx, cy});
-        this->addChild(panel, 1);
-
-        addLabel("GD Speed Macro", {cx, cy + 124.f}, 0.7f, "goldFont.fnt");
-
-        // ----- Speed -----
+        // ----- Kartu: Kecepatan -----
+        addCard({0.f, 77.f}, {396.f, 72.f});
         double sp = getSpeed();
-        addLabel(fmt::format("Speed: {:.2f}x{}", sp, std::abs(sp - 1.0) > 0.001 ? "  (progres tidak disimpan)" : ""),
-                 {cx, cy + 100.f}, 0.42f);
+        bool normal = std::abs(sp - 1.0) <= 0.001;
+        addLabel("KECEPATAN", {-188.f, 103.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
+        if (!normal) addLabel("progres tidak disimpan", {-110.f, 103.f}, 0.24f, 0.f, "bigFont.fnt", kWarn);
+        addLabel(fmt::format("{:.2f}x", sp), {188.f, 103.f}, 0.5f, 1.f, "bigFont.fnt", normal ? kGood : kWarn);
 
         double presets[] = {0.25, 0.5, 1.0, 2.0, 3.0, 5.0};
         for (int i = 0; i < 6; i++) {
             double v = presets[i];
-            addButton(fmt::format("{}x", v), {cx - 140.f + i * 56.f, cy + 74.f}, 0.5f, [this, v]() {
+            addButton(fmt::format("{}x", v), {-145.f + i * 58.f, 84.f}, 0.5f, [this, v]() {
                 setSpeed(v);
                 this->rebuild();
             });
@@ -357,67 +431,95 @@ protected:
         char const* stepNames[] = {"-0.5", "-0.1", "+0.1", "+0.5"};
         for (int i = 0; i < 4; i++) {
             double d = steps[i];
-            addButton(stepNames[i], {cx - 105.f + i * 70.f, cy + 50.f}, 0.5f, [this, d]() {
+            addButton(stepNames[i], {-105.f + i * 70.f, 60.f}, 0.5f, [this, d]() {
                 setSpeed(getSpeed() + d);
                 this->rebuild();
             });
         }
 
-        // ----- Macro -----
-        std::string status = g.loadedName.empty()
-                                 ? "Macro: belum ada"
-                                 : fmt::format("Macro: {} ({} input)", g.loadedName.substr(0, 24), g.events.size());
-        addLabel(status, {cx, cy + 24.f}, 0.36f);
-        if (!g.loadedNote.empty()) addLabel(g.loadedNote, {cx, cy + 11.f}, 0.28f);
+        // ----- Kartu: Macro -----
+        addCard({0.f, 5.f}, {396.f, 62.f});
+        addLabel("MACRO", {-188.f, 27.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
+        char const* state = g.recording ? "Merekam" : (g.playing ? "Memutar" : "Siap");
+        addLabel(fmt::format("{}  |  frame {}  |  {}/{}", state, g.frame, g.cursor, g.events.size()),
+                 {188.f, 27.f}, 0.24f, 1.f, "bigFont.fnt", g.recording ? kBad : (g.playing ? kGood : kMuted));
+        if (g.loadedName.empty()) {
+            addLabel("Belum ada macro dimuat", {-188.f, 13.f}, 0.32f, 0.f, "bigFont.fnt", kMuted);
+        } else {
+            addLabel(fmt::format("{} ({} input)", truncUtf8(g.loadedName, 34), g.events.size()), {-188.f, 13.f}, 0.32f,
+                     0.f);
+        }
+        if (!g.loadedNote.empty()) addLabel(g.loadedNote, {-188.f, 3.f}, 0.22f, 0.f, "bigFont.fnt", kWarn);
 
-        addButton(g.recording ? "Stop Rekam" : "Rekam", {cx - 105.f, cy - 12.f}, 0.55f, [this]() { onRecord(); });
-        addButton(g.playing ? "Stop Putar" : "Putar", {cx, cy - 12.f}, 0.55f, [this]() { onPlay(); });
-        addButton("Simpan", {cx + 100.f, cy - 12.f}, 0.55f, [this]() {
+        addButton(g.recording ? "Stop Rekam" : "Rekam", {-110.f, -12.f}, 0.55f, [this]() { onRecord(); });
+        addButton(g.playing ? "Stop Putar" : "Putar", {0.f, -12.f}, 0.55f, [this]() { onPlay(); });
+        addButton("Simpan", {110.f, -12.f}, 0.55f, [this]() {
             if (auto pl = PlayLayer::get()) saveMacro(pl);
             this->rebuild();
         });
 
-        // ----- Daftar file macro (semua jenis file di folder macros) -----
+        // ----- Kartu: File macro -----
+        addCard({0.f, -81.f}, {396.f, 98.f});
         auto files = listMacros();
         int pages = std::max(1, static_cast<int>((files.size() + kPerPage - 1) / kPerPage));
         m_page = std::clamp(m_page, 0, pages - 1);
-        addLabel(fmt::format("File di folder macros ({} file) - hal {}/{}", files.size(), m_page + 1, pages),
-                 {cx, cy - 38.f}, 0.3f);
+        addLabel("FILE MACRO", {-188.f, -43.f}, 0.3f, 0.f, "bigFont.fnt", kGold);
+        addLabel(fmt::format("{} file  |  hal {}/{}", files.size(), m_page + 1, pages), {188.f, -43.f}, 0.24f, 1.f,
+                 "bigFont.fnt", kMuted);
         if (files.empty()) {
-            addLabel("Kosong. Taruh file macro apa saja di folder (tombol Folder).", {cx, cy - 66.f}, 0.3f);
+            addLabel("Belum ada file. Rekam macro, atau taruh file di folder macros.", {0.f, -84.f}, 0.28f, 0.5f,
+                     "bigFont.fnt", kMuted);
         }
         for (int i = 0; i < kPerPage; i++) {
             size_t idx = static_cast<size_t>(m_page) * kPerPage + i;
             if (idx >= files.size()) break;
             auto path = files[idx];
-            addButton(nameOf(path).substr(0, 30), {cx, cy - 60.f - i * 22.f}, 0.4f, [this, path]() {
+            float y = -64.f - i * 22.f;
+            addButton(truncUtf8(nameOf(path), 28), {-42.f, y}, 0.4f, [this, path]() {
+                m_confirm.clear();
                 loadMacro(path);
+                this->rebuild();
+            });
+            bool armed = !m_confirm.empty() && m_confirm == path;
+            addButton(armed ? "Yakin?" : "Hapus", {152.f, y}, 0.4f, [this, path, armed]() {
+                if (armed) {
+                    std::error_code ec;
+                    std::filesystem::remove(path, ec);
+                    m_confirm.clear();
+                    if (ec) notify("Gagal menghapus file", NotificationIcon::Error);
+                    else notify("Dihapus: " + nameOf(path), NotificationIcon::Success);
+                } else {
+                    m_confirm = path;
+                }
                 this->rebuild();
             });
         }
 
         // ----- Baris bawah -----
-        float by = cy - 124.f;
-        addButton("<", {cx - 170.f, by}, 0.45f, [this]() {
+        float by = -143.f;
+        addButton("<", {-172.f, by}, 0.45f, [this]() {
+            m_confirm.clear();
             m_page--;
             this->rebuild();
         });
-        addButton("Folder", {cx - 112.f, by}, 0.42f, []() {
+        addButton("Folder", {-108.f, by}, 0.42f, []() {
             std::error_code ec;
             std::filesystem::create_directories(macrosDir(), ec);
             (void)geode::utils::file::openFolder(macrosDir());
         });
-        addButton("Dari Setting", {cx - 28.f, by}, 0.42f, [this]() {
+        addButton("Dari Setting", {-26.f, by}, 0.42f, [this]() {
             auto path = Mod::get()->getSettingValue<std::filesystem::path>("macro-file");
             if (path.empty()) {
                 notify("Pilih file di Settings mod (File macro) dulu", NotificationIcon::Warning);
                 return;
             }
+            m_confirm.clear();
             loadMacro(path);
             this->rebuild();
         });
-        addButton("Tutup", {cx + 66.f, by}, 0.42f, [this]() { this->close(); });
-        addButton(">", {cx + 170.f, by}, 0.45f, [this]() {
+        addButton("Tutup", {62.f, by}, 0.42f, [this]() { this->close(); });
+        addButton(">", {172.f, by}, 0.45f, [this]() {
+            m_confirm.clear();
             m_page++;
             this->rebuild();
         });
@@ -472,7 +574,7 @@ protected:
     }
 
     int hit(CCTouch* t) {
-        auto p = this->convertToNodeSpace(t->getLocation());
+        auto p = m_root->convertToNodeSpace(t->getLocation());
         for (int i = static_cast<int>(m_btns.size()) - 1; i >= 0; i--) {
             if (m_btns[i].node->boundingBox().containsPoint(p)) return i;
         }
@@ -581,7 +683,9 @@ class $modify(MacroBase, GJBaseGameLayer) {
                 while (g.cursor < g.events.size() && g.events[g.cursor].frame <= g.frame) {
                     auto const& e = g.events[g.cursor++];
                     // Memanggil versi asli (bukan hook) agar tidak ikut terekam / terblokir
+                    g.injecting = true;
                     GJBaseGameLayer::handleButton(e.down, e.button, !e.p2);
+                    g.injecting = false;
                     if (e.down) g.held.insert({e.button, e.p2});
                     else g.held.erase({e.button, e.p2});
                 }
@@ -598,7 +702,7 @@ class $modify(MacroBase, GJBaseGameLayer) {
     }
 
     void handleButton(bool down, int button, bool isPlayer1) {
-        if (isThisPlayLayer(this)) {
+        if (isThisPlayLayer(this) && !g.injecting) {
             if (g.playing) return;  // input manual diblok selama macro berjalan
             if (g.recording) {
                 g.events.push_back({g.frame, static_cast<uint8_t>(button), !isPlayer1, down});
