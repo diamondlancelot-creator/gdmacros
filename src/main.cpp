@@ -7,7 +7,7 @@
 //  - SAFE MODE: while speed != 1.0, a macro is playing, or No Clip is on, the level is
 //    marked as test mode so progress / percent / completion is NOT saved or submitted.
 //
-// Limits: classic levels only (no platformer), normal mode (no practice), 240 TPS.
+// Limits: classic levels only (no platformer), 240 TPS. Practice mode is supported (checkpoints rewind the macro).
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -310,6 +310,45 @@ void stopPlaying(PlayLayer* pl) {
 void finishRecording(PlayLayer* pl) {
     g.recording = false;
     saveMacro(pl);
+}
+
+// ---------- Practice mode: checkpoints remember the macro frame ----------
+std::map<CheckpointObject*, uint64_t> g_cpFrame;
+
+// Called after the game has loaded a checkpoint (or restarted from the start).
+// cpFrame = macro frame the checkpoint was made at (0 = start of the level).
+void rewindMacroTo(PlayLayer* pl, uint64_t cpFrame) {
+    g.frame = cpFrame;
+
+    // button state according to the events before the checkpoint
+    std::set<std::pair<int, bool>> state;
+    size_t next = 0;
+    for (size_t i = 0; i < g.events.size(); i++) {
+        auto const& e = g.events[i];
+        if (e.frame >= cpFrame) break;
+        if (e.down) state.insert({e.button, e.p2});
+        else state.erase({e.button, e.p2});
+        next = i + 1;
+    }
+
+    if (g.recording) {
+        // drop everything recorded after the checkpoint
+        g.events.resize(next);
+        // the game restarts with no button held, so close any press that was still open
+        for (auto const& [button, p2] : state) {
+            g.events.push_back({cpFrame, static_cast<uint8_t>(button), p2, false});
+        }
+    } else if (g.playing) {
+        g.cursor = next;
+        g.held.clear();
+        // re-press buttons that were held at the checkpoint
+        g.injecting = true;
+        for (auto const& [button, p2] : state) {
+            pl->handleButton(true, button, !p2);
+            g.held.insert({button, p2});
+        }
+        g.injecting = false;
+    }
 }
 
 // ---------- Safe mode ----------
@@ -859,16 +898,11 @@ protected:
             this->rebuild();
             return;
         }
-        if (pl->m_isPracticeMode) {
-            notify("Recording works in normal mode only (not practice)", NotificationIcon::Warning);
-            return;
-        }
         if (g.playing) stopPlaying(pl);
         g.events.clear();
         g.loadedName.clear();
         g.loadedNote.clear();
         g.recording = true;
-        notify("Recording from the start of the level...", NotificationIcon::Success);
         restartLevel();
         this->close();
     }
@@ -878,7 +912,6 @@ protected:
         if (!pl) return;
         if (g.playing) {
             stopPlaying(pl);
-            notify("Macro stopped");
             this->rebuild();
             return;
         }
@@ -886,15 +919,10 @@ protected:
             notify("Load or record a macro first", NotificationIcon::Warning);
             return;
         }
-        if (pl->m_isPracticeMode) {
-            notify("Playback works in normal mode only (not practice)", NotificationIcon::Warning);
-            return;
-        }
         g.recording = false;
         g.playing = true;
         g.cursor = 0;
         g.held.clear();
-        notify("Playing macro (progress will not be saved)", NotificationIcon::Success);
         restartLevel();
         this->close();
     }
@@ -1038,6 +1066,21 @@ void pollHotkey() {
 
 }  // namespace
 
+// ---------- Music follows the speed (FMOD pitch) ----------
+static void syncMusicPitch(float s) {
+    static bool applied = false;
+    auto engine = FMODAudioEngine::sharedEngine();
+    if (!engine || !engine->m_backgroundMusicChannel) return;
+    if (g.speedActive) {
+        // set every frame: the game resets the pitch whenever the song restarts
+        engine->m_backgroundMusicChannel->setPitch(s);
+        applied = true;
+    } else if (applied) {
+        engine->m_backgroundMusicChannel->setPitch(1.f);
+        applied = false;
+    }
+}
+
 // ---------- Speed: scale the scheduler's delta time ----------
 class $modify(MacroScheduler, CCScheduler) {
     void update(float dt) {
@@ -1049,6 +1092,7 @@ class $modify(MacroScheduler, CCScheduler) {
         }
         g.speedActive = std::abs(s - 1.f) > 0.001f;
         CCScheduler::update(dt * s);
+        syncMusicPitch(s);
         pollHotkey();  // after the original update so changing the scene is safe
     }
 };
@@ -1071,7 +1115,6 @@ class $modify(MacroBase, GJBaseGameLayer) {
                 }
                 if (g.cursor >= g.events.size()) {
                     stopPlaying(pl);
-                    notify("Macro finished, you have control again", NotificationIcon::Success);
                 }
             }
             // SAFE MODE: mark as test mode so no progress is saved
@@ -1099,14 +1142,22 @@ class $modify(MacroPlay, PlayLayer) {
         PlayLayer::destroyPlayer(player, object);
     }
 
+    void storeCheckpoint(CheckpointObject* cp) {
+        PlayLayer::storeCheckpoint(cp);
+        if (cp) g_cpFrame[cp] = g.frame;
+    }
+
     void resetLevel() {
-        PlayLayer::resetLevel();
-        g.frame = 0;
-        if (g.recording) g.events.clear();  // new attempt = record again from the start
-        if (g.playing) {
-            g.cursor = 0;
-            g.held.clear();
+        // practice mode: respawn at the last checkpoint if there is one
+        uint64_t cpFrame = 0;
+        if (m_isPracticeMode && m_checkpointArray && m_checkpointArray->count() > 0) {
+            auto cp = static_cast<CheckpointObject*>(m_checkpointArray->lastObject());
+            auto it = g_cpFrame.find(cp);
+            if (it != g_cpFrame.end()) cpFrame = it->second;
         }
+        PlayLayer::resetLevel();
+        if (g.recording || g.playing) rewindMacroTo(this, cpFrame);
+        else g.frame = cpFrame;
     }
 
     void levelComplete() {
