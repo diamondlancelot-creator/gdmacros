@@ -6,10 +6,16 @@
 	},
 	"id": "namakamu.gdspeedmacro",
 	"name": "GD Speed Macro",
-	"version": "v1.2.0",
+	"version": "v1.3.0",
 	"developer": "namakamu",
-	"description": "Menu in-game (hotkey Y) untuk mengatur kecepatan game serta merekam dan memutar macro. Mendukung GDR2 dan .zbf (zBot). Rekaman disimpan otomatis dengan nama <ID level>_<nama level>. Progres level tidak tersimpan saat speed diubah atau macro diputar.",
+	"description": "Menu in-game (hotkey Y) untuk mengatur kecepatan, merekam dan memutar macro, serta mengaktifkan No Clip. Mendukung GDR2 dan .zbf (zBot). Rekaman disimpan otomatis dengan nama <ID level>_<nama level>. Safe mode (aktif secara default) mencegah progres tersimpan saat speed, macro, atau No Clip dipakai.",
 	"settings": {
+		"safe-mode": {
+			"type": "bool",
+			"name": "Safe mode",
+			"description": "Bila aktif, level ditandai test mode saat speed diubah, macro diputar, atau No Clip menyala, sehingga progres dan completion tidak tersimpan atau terkirim. Dapat diubah juga dari menu mod.",
+			"default": true
+		},
 		"menu-key": {
 			"type": "string",
 			"name": "Tombol menu",
