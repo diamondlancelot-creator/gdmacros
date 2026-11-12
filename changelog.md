@@ -2,7 +2,7 @@
 
 ## v1.4.0
 
-- Redesigned the menu: a tabbed window (Speed, Macro, Files, Options) with a dark navy theme and gold, orange and cyan accents
+- Redesigned the menu with a modern, web-style look: a tabbed window (Speed, Macro, Files, Options) in dark navy with a single blue accent, bordered cards, flat buttons and a live Safe Mode badge in the header
 - Added a draggable speed slider, with presets and fine-tune buttons
 - Added smooth open, tab-switch and button-press animations; click outside the window to close it
 - Added switch-style toggles for Safe Mode and No Clip
