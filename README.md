@@ -8,7 +8,7 @@ A Geode mod for Geometry Dash that adds an in-game menu (default key `Y`) with s
 
 - **Speed control:** presets from 0.25x to 5x, plus fine adjustment in steps of 0.1 and 0.5
 - **Macro recording and playback** at 240 TPS using the GDR2 format; recordings are saved as `<level ID>_<level name>.gdr2`
-- **Macro import:** load GDR2/GDR files and zBot `.zbf` files; list and delete saved macros from the menu
+- **Macro import:** press **Import...** in the menu (works inside a level) to pick a GDR2/GDR or zBot `.zbf` file; it is copied to the macros folder and loaded. Saved macros can be listed and deleted from the menu
 - **No Clip:** ignore deaths during a session (resets when the game restarts)
 - **Safe mode (on by default):** while speed changes, macro playback, or No Clip are in use, the level is marked as test mode, so progress is not saved or submitted
 
@@ -21,8 +21,8 @@ Copy `namakamu.replaytools.geode` to `%localappdata%\GeometryDash\geode\mods` an
 1. Enter a level and press `Y` to open the Replay Tools menu. The key can be changed in the mod settings.
 2. On the **Speed** tab, drag the slider, pick a preset, or fine-tune with the `-` / `+` buttons.
 3. On the **Macro** tab, press **Record** to restart the level and record your inputs. Press **Stop** (or finish the level) to save the macro.
-4. On the **Files** tab, press **Load** next to a macro, then press **Play** on the **Macro** tab to replay it.
-5. Use **Open Folder** to open the macros folder, or **From Settings** to load a file chosen in the mod settings. Safe Mode and No Clip are on the **Options** tab.
+4. On the **Files** tab, press **Import...** to pick a macro file from anywhere on your PC, or press **Load** next to a macro that is already in the list. Then press **Play** on the **Macro** tab to replay it.
+5. Use **Open Folder** to open the macros folder. Safe Mode and No Clip are on the **Options** tab.
 
 ## Settings
 
@@ -31,12 +31,11 @@ Copy `namakamu.replaytools.geode` to `%localappdata%\GeometryDash\geode\mods` an
 | Safe mode | Marks the level as test mode when speed, macro playback, or No Clip is active. On by default. |
 | Menu key | Letter or number that opens the menu in a level. Default: `Y`. |
 | Game speed | Speed multiplier from 0.1 to 5.0. `1.0` is normal. |
-| Macro file | Pick any macro file, then press **From Settings** in the menu to load it. |
 
 ## Notes
 
 - Disabling safe mode lets results from these features be saved and submitted, which may be flagged by the game's anti-cheat. Use at your own risk.
-- Classic levels and 240 TPS only. Practice mode is supported: dying rewinds the macro to the last checkpoint. Macros recorded at other TPS values are converted and may be inaccurate.
+- Classic levels and 240 TPS only. Practice mode is supported: the macro follows the level's own step counter, so dying rewinds it to the last checkpoint exactly, regardless of how many clicks were made. Record and Play always start from the beginning of the level (practice checkpoints are cleared first). Macros recorded at other TPS values are converted and may be inaccurate.
 - Platformer macros are not supported.
 - The hotkey works on Windows only.
 
