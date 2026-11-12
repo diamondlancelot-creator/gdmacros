@@ -1,4 +1,4 @@
-// GD Speed Macro - mod Geode
+// Replay Tools - Geode mod
 //  - Menu sendiri (BUKAN di layar pause): tekan hotkey (default Y) di dalam level
 //  - Speed: tombol preset + tombol -/+ langsung di menu
 //  - Rekam / putar macro berbasis frame (240 TPS), format GDR2 (sama dengan bot lain)
@@ -59,7 +59,7 @@ static auto resultValue(R&& r) {
 namespace {
 
 struct MacroReplay : gdr::Replay<MacroReplay, gdr::Input<>> {
-    MacroReplay() : Replay("GDSpeedMacro", 1) {}
+    MacroReplay() : Replay("ReplayTools", 1) {}
 };
 
 struct Ev {
@@ -140,7 +140,7 @@ std::string sanitizeFileName(std::string const& in) {
 
 std::vector<uint8_t> buildReplay(PlayLayer* pl) {
     MacroReplay r;
-    r.author = "GDSpeedMacro";
+    r.author = "ReplayTools";
     r.framerate = 240.0;
     r.gameVersion = GEODE_COMP_GD_VERSION;
     r.platformer = false;
@@ -420,7 +420,7 @@ protected:
             panel->setContentSize({420.f, 312.f});
             m_root->addChild(panel, 0);
         }
-        addLabel("GD Speed Macro", {0.f, 141.f}, 0.65f, 0.5f, "goldFont.fnt");
+        addLabel("Replay Tools", {0.f, 141.f}, 0.65f, 0.5f, "goldFont.fnt");
 
         // ----- Kartu: Kecepatan -----
         addCard({0.f, 92.f}, {396.f, 64.f});
