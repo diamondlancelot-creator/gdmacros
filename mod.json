@@ -6,14 +6,20 @@
 	},
 	"id": "namakamu.gdspeedmacro",
 	"name": "GD Speed Macro",
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"developer": "namakamu",
-	"description": "Speed control + perekam/pemutar macro (format GDR2, kompatibel dengan bot lain). Aman: progres level tidak tersimpan saat speed diubah / macro diputar.",
+	"description": "Menu sendiri (hotkey Y) untuk speed + rekam/putar macro. Muat macro dari file apa saja (GDR2, zBot .zbf). Aman: progres level tidak tersimpan saat speed diubah / macro diputar.",
 	"settings": {
+		"menu-key": {
+			"type": "string",
+			"name": "Tombol menu",
+			"description": "Huruf atau angka untuk membuka menu mod di dalam level (default: Y).",
+			"default": "Y"
+		},
 		"speed": {
 			"type": "float",
 			"name": "Kecepatan game",
-			"description": "1.0 = normal. Selain 1.0, progres level TIDAK disimpan (safe mode).",
+			"description": "1.0 = normal. Selain 1.0, progres level TIDAK disimpan (safe mode). Lebih mudah diatur lewat menu hotkey.",
 			"default": 1.0,
 			"min": 0.1,
 			"max": 5.0,
@@ -25,14 +31,14 @@
 		"macro-file": {
 			"type": "file",
 			"name": "File macro untuk dimuat",
-			"description": "Pilih file macro (.gdr2 / .gdr dari bot lain), lalu tekan tombol Muat di menu pause.",
+			"description": "Pilih file macro apa saja, lalu tekan 'Dari Setting' di menu mod.",
 			"default": "",
 			"control": {
 				"dialog": "open",
 				"filters": [
 					{
-						"files": ["*.gdr2", "*.gdr"],
-						"description": "Geometry Dash Replay"
+						"files": ["*.*"],
+						"description": "Semua file"
 					}
 				]
 			}
