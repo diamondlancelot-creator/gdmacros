@@ -7,7 +7,8 @@
 //  - SAFE MODE: while speed != 1.0, a macro is playing, or No Clip is on, the level is
 //    marked as test mode so progress / percent / completion is NOT saved or submitted.
 //
-// Limits: classic levels only (no platformer), 240 TPS. Practice mode is supported (checkpoints rewind the macro).
+// Limits: classic levels only (no platformer), 240 TPS. Practice mode is supported: the macro frame is the
+// level's own physics step, so checkpoints / respawns stay in sync with the level (not with click count).
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -22,6 +23,7 @@
 
 #ifdef GEODE_IS_WINDOWS
 #include <windows.h>
+#include <commdlg.h>
 #endif
 
 #include <algorithm>
@@ -33,6 +35,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string_view>
 #include <string>
@@ -76,7 +79,7 @@ struct State {
     bool speedActive = false;
     bool noclip = false;         // No Clip (this game session only, not saved)
     bool injecting = false;      // true while the macro itself presses buttons (don't block / record)
-    uint64_t frame = 0;          // physics step number since the start of the attempt
+    uint64_t frame = 0;          // the level's own physics step (m_gameState.m_currentProgress), read at the start of each step
     std::vector<Ev> events;
     size_t cursor = 0;
     std::set<std::pair<int, bool>> held;  // buttons currently "held" by the macro
@@ -91,6 +94,13 @@ void notify(std::string const& msg, NotificationIcon icon = NotificationIcon::No
 bool isThisPlayLayer(GJBaseGameLayer* layer) {
     auto pl = PlayLayer::get();
     return pl && static_cast<GJBaseGameLayer*>(pl) == layer;
+}
+
+// The macro frame is the level's own step counter. The game restores it when a checkpoint is loaded,
+// so practice mode stays synced with the level without any bookkeeping of our own.
+uint64_t levelStep(GJBaseGameLayer* layer) {
+    int p = layer->m_gameState.m_currentProgress;
+    return p > 0 ? static_cast<uint64_t>(p) : 0;
 }
 
 std::filesystem::path macrosDir() {
@@ -291,6 +301,52 @@ bool loadMacro(std::filesystem::path const& path) {
     return true;
 }
 
+// ---------- Import: pick a file from inside the level (no mod settings needed) ----------
+#ifdef GEODE_IS_WINDOWS
+std::optional<std::filesystem::path> pickMacroFile() {
+    wchar_t buf[MAX_PATH * 4] = {};
+    OPENFILENAMEW ofn{};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = GetForegroundWindow();
+    ofn.lpstrFilter = L"Macro files (*.gdr2;*.gdr;*.zbf;*.json)\0*.gdr2;*.gdr;*.zbf;*.json\0All files (*.*)\0*.*\0";
+    ofn.lpstrFile = buf;
+    ofn.nMaxFile = static_cast<DWORD>(sizeof(buf) / sizeof(wchar_t));
+    ofn.lpstrTitle = L"Select a macro file";
+    // OFN_NOCHANGEDIR: the game's working directory must not change
+    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+    if (!GetOpenFileNameW(&ofn)) return std::nullopt;
+    return std::filesystem::path(std::wstring(buf));
+}
+#endif
+
+// Copies the file into the macros folder (so it shows up in the list) and loads it.
+bool importMacro(std::filesystem::path const& src) {
+    std::error_code ec;
+    auto dir = macrosDir();
+    std::filesystem::create_directories(dir, ec);
+
+    auto dest = dir / src.filename();
+    bool copied = false;
+    if (!std::filesystem::equivalent(src.parent_path(), dir, ec)) {
+        auto stem = src.stem();
+        auto ext = src.extension();
+        for (int n = 2; n < 1000 && std::filesystem::exists(dest, ec); n++) {
+            dest = dir / (stem.native() + pathFromUtf8("_" + std::to_string(n)).native() + ext.native());
+        }
+        std::filesystem::copy_file(src, dest, std::filesystem::copy_options::none, ec);
+        if (ec) {
+            notify("Failed to copy file into the macros folder", NotificationIcon::Error);
+            return false;
+        }
+        copied = true;
+    }
+    if (!loadMacro(dest)) {
+        if (copied) std::filesystem::remove(dest, ec);  // don't leave an unusable file behind
+        return false;
+    }
+    return true;
+}
+
 void releaseHeld(PlayLayer* pl) {
     if (pl) {
         g.injecting = true;
@@ -312,11 +368,9 @@ void finishRecording(PlayLayer* pl) {
     saveMacro(pl);
 }
 
-// ---------- Practice mode: checkpoints remember the macro frame ----------
-std::map<CheckpointObject*, uint64_t> g_cpFrame;
-
+// ---------- Practice mode: rewind the macro to the level step of the checkpoint ----------
 // Called after the game has loaded a checkpoint (or restarted from the start).
-// cpFrame = macro frame the checkpoint was made at (0 = start of the level).
+// cpFrame = the level step the game is at now (0 = start of the level).
 void rewindMacroTo(PlayLayer* pl, uint64_t cpFrame) {
     g.frame = cpFrame;
 
@@ -789,8 +843,8 @@ protected:
 
         addCard({48.f, -76.f}, {324.f, 70.f});
         addText("Records at 240 TPS (GDR2 format).", {-106.f, -58.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
-        addText("Classic levels and normal mode only.", {-106.f, -74.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
-        addText("Playback always starts from the beginning.", {-106.f, -90.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
+        addText("Practice mode: synced to the level, not to clicks.", {-106.f, -74.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
+        addText("Record / Play start from the beginning of the level.", {-106.f, -90.f}, 0.55f, kMuted, 0.f, kBody, 300.f);
     }
 
     // ----- Files tab -----
@@ -847,20 +901,22 @@ protected:
             m_page++;
             this->rebuild();
         }, 0.8f);
-        addBtn("Open Folder", {20.f, by}, {96.f, 24.f}, Style::Secondary, []() {
+        addBtn("Open Folder", {2.f, by}, {90.f, 24.f}, Style::Secondary, []() {
             std::error_code ec;
             std::filesystem::create_directories(macrosDir(), ec);
             (void)geode::utils::file::openFolder(macrosDir());
         });
-        addBtn("From Settings", {138.f, by}, {108.f, 24.f}, Style::Primary, [this]() {
-            auto path = Mod::get()->getSettingValue<std::filesystem::path>("macro-file");
-            if (path.empty()) {
-                notify("Pick a file in the mod settings (Macro file) first", NotificationIcon::Warning);
-                return;
-            }
+        addBtn("Import...", {130.f, by}, {128.f, 24.f}, Style::Primary, [this]() {
             m_confirm.clear();
-            loadMacro(path);
+#ifdef GEODE_IS_WINDOWS
+            auto picked = pickMacroFile();
+            if (!picked) return;  // dialog cancelled
+            m_page = 0;
+            importMacro(*picked);
             this->rebuild();
+#else
+            notify("Import is Windows only. Use Open Folder and copy the file in.", NotificationIcon::Warning);
+#endif
         });
     }
 
@@ -903,6 +959,8 @@ protected:
         g.loadedName.clear();
         g.loadedNote.clear();
         g.recording = true;
+        // Always record from the start of the level, even in practice mode.
+        if (pl->m_isPracticeMode) pl->removeAllCheckpoints();
         restartLevel();
         this->close();
     }
@@ -923,6 +981,8 @@ protected:
         g.playing = true;
         g.cursor = 0;
         g.held.clear();
+        // Playback also starts from the start of the level, so drop practice checkpoints first.
+        if (pl->m_isPracticeMode) pl->removeAllCheckpoints();
         restartLevel();
         this->close();
     }
@@ -1103,6 +1163,7 @@ class $modify(MacroBase, GJBaseGameLayer) {
         bool mine = isThisPlayLayer(this);
         if (mine) {
             auto pl = PlayLayer::get();
+            g.frame = levelStep(this);  // the level's own step: record and playback share this clock
             if (g.playing) {
                 while (g.cursor < g.events.size() && g.events[g.cursor].frame <= g.frame) {
                     auto const& e = g.events[g.cursor++];
@@ -1121,7 +1182,6 @@ class $modify(MacroBase, GJBaseGameLayer) {
             if (needTestMode()) pl->m_isTestMode = true;
         }
         GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
-        if (mine && !isHalfTick) g.frame++;
     }
 
     void handleButton(bool down, int button, bool isPlayer1) {
@@ -1142,22 +1202,14 @@ class $modify(MacroPlay, PlayLayer) {
         PlayLayer::destroyPlayer(player, object);
     }
 
-    void storeCheckpoint(CheckpointObject* cp) {
-        PlayLayer::storeCheckpoint(cp);
-        if (cp) g_cpFrame[cp] = g.frame;
-    }
-
     void resetLevel() {
-        // practice mode: respawn at the last checkpoint if there is one
-        uint64_t cpFrame = 0;
-        if (m_isPracticeMode && m_checkpointArray && m_checkpointArray->count() > 0) {
-            auto cp = static_cast<CheckpointObject*>(m_checkpointArray->lastObject());
-            auto it = g_cpFrame.find(cp);
-            if (it != g_cpFrame.end()) cpFrame = it->second;
-        }
+        // Practice mode: the game has just put the level back at the last checkpoint (or the start).
+        // Take the macro frame from the level itself so macro and level can never drift apart.
+        bool hasCp = m_isPracticeMode && m_checkpointArray && m_checkpointArray->count() > 0;
         PlayLayer::resetLevel();
-        if (g.recording || g.playing) rewindMacroTo(this, cpFrame);
-        else g.frame = cpFrame;
+        uint64_t f = hasCp ? levelStep(this) : 0;
+        g.frame = f;
+        if (g.recording || g.playing) rewindMacroTo(this, f);
     }
 
     void levelComplete() {
