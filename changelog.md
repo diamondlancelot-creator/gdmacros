@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.0
+
+- Practice mode macros are now synced to the level itself: the macro frame is the level's own physics step, so respawning at a checkpoint rewinds the macro to exactly that point instead of relying on our own counter or the number of clicks
+- Record and Play in practice mode now always start from the beginning of the level (existing checkpoints are cleared first)
+- Added an **Import...** button on the Files tab: pick a macro file from inside a level, it is copied to the macros folder and loaded right away
+- Removed the "Macro file" mod setting and the **From Settings** button, which could not be used from inside a level
+
 ## v1.4.1
 
 - Removed the notifications shown when macro recording or playback starts, stops or finishes
