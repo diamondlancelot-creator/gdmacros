@@ -6,7 +6,7 @@
 	},
 	"id": "namakamu.replaytools",
 	"name": "Replay Tools",
-	"version": "v1.4.1",
+	"version": "v1.5.0",
 	"developer": "namakamu",
 	"description": "In-game menu (hotkey Y) for speed control, macro recording/playback and No Clip. Safe mode is on by default.",
 	"settings": {
@@ -32,23 +32,6 @@
 			"control": {
 				"slider": true,
 				"input": true
-			}
-		},
-		"macro-file": {
-			"type": "file",
-			"name": "Macro file to load",
-			"description": "Pick any macro file, then press 'From Settings' in the mod menu.",
-			"default": "",
-			"control": {
-				"dialog": "open",
-				"filters": [
-					{
-						"files": [
-							"*.*"
-						],
-						"description": "All files"
-					}
-				]
 			}
 		}
 	}
