@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.4.1
+
+- Removed the notifications shown when macro recording or playback starts, stops or finishes
+- The song now follows the speed (its pitch changes with the speed setting)
+- Macro recording and playback now work in practice mode: the macro rewinds to the checkpoint when you respawn
+
 ## v1.4.0
 
 - Redesigned the menu with a modern, web-style look: a tabbed window (Speed, Macro, Files, Options) in dark navy with a single blue accent, bordered cards, flat buttons and a live Safe Mode badge in the header
