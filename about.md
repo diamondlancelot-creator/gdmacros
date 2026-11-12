@@ -1,15 +1,7 @@
-# GD Speed Macro
+# Replay Tools
 
-Satu menu untuk mengatur kecepatan game dan mengelola macro. Tekan **Y** di dalam level untuk membukanya.
+In-game menu (key **Y**) for speed control, macro record/playback and No Clip.
 
-- Preset kecepatan dan penyesuaian halus langsung di menu
-- Rekam dan putar macro (240 TPS), format GDR2
-- Rekaman tersimpan otomatis sebagai `<ID level>_<nama level>.gdr2`
-- Daftar file macro dengan opsi muat dan hapus
-- Dapat memuat GDR2/GDR dan `.zbf` (zBot)
-
-**Safe mode:** saat kecepatan bukan 1.0 atau macro sedang diputar, level ditandai test mode dan progres
-tidak tersimpan.
-
-**Catatan:** macro yang tidak direkam pada 240 TPS dikonversi dan bisa kurang akurat.
-Macro platformer belum didukung.
+- Recordings are saved as `<level ID>_<level name>.gdr2`
+- Loads GDR2/GDR and zBot `.zbf` files
+- Safe mode is on by default and prevents progress from being saved while these features are used
