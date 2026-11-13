@@ -1,5 +1,6 @@
 // Replay Tools - Geode mod
 //  - Own menu (NOT on the pause screen): hotkey (default Y) in a level, Ctrl+Y anywhere else
+//  - Stop key (default X): switches the macro off while a level is being played
 //  - Speed: slider, presets and fine-tune buttons
 //  - Record / play frame-based macros (240 TPS), GDR2 format (compatible with other bots)
 //  - Load macros from any file: GDR2/GDR, GDR JSON and .zbf (zBot). Macros that are not
@@ -77,6 +78,7 @@ struct State {
     bool recording = false;
     bool playing = false;
     bool speedActive = false;
+    bool tainted = false;        // an assist was used in this level run: stays marked until the level is left
     bool autoPlay = false;       // auto-start the loaded macro when a level opens (this session only)
     bool noclip = false;         // No Clip (this game session only, not saved)
     bool injecting = false;      // true while the macro itself presses buttons (don't block / record)
@@ -414,6 +416,14 @@ bool safeMode() {
 // The level is marked as test mode when safe mode is on and any assist is active.
 bool needTestMode() {
     return safeMode() && (g.playing || g.speedActive || g.noclip);
+}
+
+// Safe mode: once any assist was used in this level run, the level stays in test mode until it is left,
+// even if the macro already ended or the speed went back to 1.0 before the level was completed.
+void markSafe(PlayLayer* pl) {
+    if (!pl) return;
+    if (needTestMode()) g.tainted = true;
+    if (g.tainted && safeMode()) pl->m_isTestMode = true;
 }
 
 // ---------- Speed ----------
@@ -1142,6 +1152,32 @@ void pollHotkey() {
     }
     if (now && !prev) toggleMenu();
     prev = now;
+
+    // Stop key: switches the macro off while the level is being played (works with or without the menu open)
+    static bool prevStop = false;
+    bool nowStop = false;
+    {
+        auto key = Mod::get()->getSettingValue<std::string>("stop-key");
+        int vk = 'X';
+        if (!key.empty() && std::isalnum(static_cast<unsigned char>(key[0]))) {
+            vk = std::toupper(static_cast<unsigned char>(key[0]));
+        }
+        DWORD pid = 0;
+        GetWindowThreadProcessId(GetForegroundWindow(), &pid);
+        nowStop = pid == GetCurrentProcessId() && PlayLayer::get() != nullptr && (GetAsyncKeyState(vk) & 0x8000) != 0;
+    }
+    if (nowStop && !prevStop) {
+        if (auto pl = PlayLayer::get()) {
+            if (g.recording) {
+                finishRecording(pl);
+                notify("Recording stopped and saved");
+            } else if (g.playing) {
+                stopPlaying(pl);
+                notify("Macro stopped");
+            }
+        }
+    }
+    prevStop = nowStop;
 #endif
 }
 
@@ -1185,6 +1221,7 @@ class $modify(MacroBase, GJBaseGameLayer) {
         if (mine) {
             auto pl = PlayLayer::get();
             g.frame = levelStep(this);  // the level's own step: record and playback share this clock
+            markSafe(pl);  // before the macro can stop itself on this tick
             if (g.playing) {
                 while (g.cursor < g.events.size() && g.events[g.cursor].frame <= g.frame) {
                     auto const& e = g.events[g.cursor++];
@@ -1200,7 +1237,7 @@ class $modify(MacroBase, GJBaseGameLayer) {
                 }
             }
             // SAFE MODE: mark as test mode so no progress is saved
-            if (needTestMode()) pl->m_isTestMode = true;
+            markSafe(pl);
         }
         GJBaseGameLayer::processCommands(dt, isHalfTick, isLastTick);
     }
@@ -1225,11 +1262,14 @@ class $modify(MacroPlay, PlayLayer) {
             g.frame = 0;
             g.held.clear();
         }
+        g.tainted = false;  // new level run
         PlayLayer::setupHasCompleted();
+        markSafe(this);
     }
 
     // No Clip: ignore deaths, except from the game's own anticheat spike
     void destroyPlayer(PlayerObject* player, GameObject* object) {
+        markSafe(this);  // also covers the death percent
         if (g.noclip && object != m_anticheatSpike) return;
         PlayLayer::destroyPlayer(player, object);
     }
@@ -1242,10 +1282,11 @@ class $modify(MacroPlay, PlayLayer) {
         uint64_t f = hasCp ? levelStep(this) : 0;
         g.frame = f;
         if (g.recording || g.playing) rewindMacroTo(this, f);
+        markSafe(this);
     }
 
     void levelComplete() {
-        if (needTestMode()) m_isTestMode = true;  // safe mode
+        markSafe(this);  // safe mode
         bool wasRecording = g.recording;
         PlayLayer::levelComplete();
         if (wasRecording) finishRecording(this);
@@ -1257,6 +1298,7 @@ class $modify(MacroPlay, PlayLayer) {
         g.playing = false;
         g.recording = false;
         g.held.clear();
+        g.tainted = false;
         PlayLayer::onQuit();
     }
 };
