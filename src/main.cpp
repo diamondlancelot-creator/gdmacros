@@ -1,5 +1,5 @@
 // Replay Tools - Geode mod
-//  - Own in-game menu (NOT on the pause screen): press the hotkey (default Y) inside a level
+//  - Own menu (NOT on the pause screen): hotkey (default Y) in a level, Ctrl+Y anywhere else
 //  - Speed: slider, presets and fine-tune buttons
 //  - Record / play frame-based macros (240 TPS), GDR2 format (compatible with other bots)
 //  - Load macros from any file: GDR2/GDR, GDR JSON and .zbf (zBot). Macros that are not
@@ -77,6 +77,7 @@ struct State {
     bool recording = false;
     bool playing = false;
     bool speedActive = false;
+    bool autoPlay = false;       // auto-start the loaded macro when a level opens (this session only)
     bool noclip = false;         // No Clip (this game session only, not saved)
     bool injecting = false;      // true while the macro itself presses buttons (don't block / record)
     uint64_t frame = 0;          // the level's own physics step (m_gameState.m_currentProgress), read at the start of each step
@@ -499,22 +500,23 @@ protected:
     static constexpr char const* kBody = "chatFont.fnt";
     static constexpr char const* kHead = "bigFont.fnt";
 
-    // Palette: deep navy surfaces, one blue accent, soft status colors
+    // Palette (from the artwork): deep midnight blue surfaces, one electric cyan accent
     static inline const ccColor3B kWhite{255, 255, 255};
-    static inline const ccColor3B kText{228, 234, 245};
-    static inline const ccColor3B kMuted{132, 147, 178};
-    static inline const ccColor3B kLabel{96, 165, 250};
-    static inline const ccColor3B kAccent{59, 130, 246};
-    static inline const ccColor3B kBg{11, 18, 32};
-    static inline const ccColor3B kBar{15, 23, 42};
-    static inline const ccColor3B kSide{13, 20, 37};
-    static inline const ccColor3B kCard{17, 27, 46};
-    static inline const ccColor3B kBorder{32, 45, 72};
-    static inline const ccColor3B kBtn{24, 36, 60};
-    static inline const ccColor3B kSel{26, 50, 94};
-    static inline const ccColor3B kOff{51, 65, 85};
-    static inline const ccColor3B kTrack{36, 48, 76};
-    static inline const ccColor3B kGood{52, 211, 153};
+    static inline const ccColor3B kText{226, 250, 252};
+    static inline const ccColor3B kMuted{116, 158, 178};
+    static inline const ccColor3B kLabel{45, 226, 230};
+    static inline const ccColor3B kAccent{0, 214, 220};
+    static inline const ccColor3B kOnAccent{4, 18, 34};
+    static inline const ccColor3B kBg{5, 15, 30};
+    static inline const ccColor3B kBar{7, 21, 40};
+    static inline const ccColor3B kSide{6, 18, 36};
+    static inline const ccColor3B kCard{9, 27, 48};
+    static inline const ccColor3B kBorder{16, 58, 84};
+    static inline const ccColor3B kBtn{12, 38, 64};
+    static inline const ccColor3B kSel{8, 60, 84};
+    static inline const ccColor3B kOff{36, 60, 82};
+    static inline const ccColor3B kTrack{18, 48, 74};
+    static inline const ccColor3B kGood{52, 230, 190};
     static inline const ccColor3B kWarn{251, 191, 36};
     static inline const ccColor3B kBad{248, 113, 113};
     static inline const ccColor3B kDanger{220, 70, 80};
@@ -523,7 +525,7 @@ protected:
         if (!CCLayer::init()) return false;
         this->setTouchEnabled(true);
 
-        auto dim = CCLayerColor::create(ccColor4B{2, 6, 16, 0});
+        auto dim = CCLayerColor::create(ccColor4B{1, 8, 18, 0});
         dim->runAction(CCFadeTo::create(0.2f, 185));
         this->addChild(dim, 0);
 
@@ -587,7 +589,7 @@ protected:
         bool hasInner = true;
         if (st == Style::Primary) {
             outer = kAccent;
-            textCol = kWhite;
+            textCol = kOnAccent;
             hasInner = false;
         } else if (st == Style::Danger) {
             outer = kDanger;
@@ -644,14 +646,15 @@ protected:
 
     void buildFrame() {
         m_cur = m_root;
-        addBox({0.f, -4.f}, {450.f, 280.f}, {0, 0, 0}, 110, 0);   // soft shadow
+        addBox({0.f, 0.f}, {452.f, 282.f}, kAccent, 38, 0);       // soft cyan glow
+        addBox({0.f, -4.f}, {448.f, 278.f}, {0, 0, 0}, 110, 0);   // soft shadow
         addBox({0.f, 0.f}, {442.f, 272.f}, kBorder, 255, 0);      // 1px border
         addBox({0.f, 0.f}, {440.f, 270.f}, kBg, 255, 0);          // window body
 
         // header bar: rounded top, flat bottom edge
         addBox({0.f, 120.f}, {436.f, 28.f}, kBar, 255, 0);
         addRect({-218.f, 105.f}, {436.f, 16.f}, kBar, 0);
-        addRect({-218.f, 104.f}, {436.f, 1.f}, kBorder, 1);
+        addRect({-218.f, 104.f}, {436.f, 1.f}, kAccent, 1);
 
         addRect({-212.f, 116.f}, {8.f, 8.f}, kAccent, 2);
         addText("Replay Tools", {-198.f, 120.f}, 0.42f, kWhite, 0.f, kHead);
@@ -806,7 +809,7 @@ protected:
         addCard({48.f, 64.f}, {324.f, 72.f});
         addSection("STATUS", {-106.f, 90.f});
 
-        ccColor3B badgeBg = {30, 41, 66};
+        ccColor3B badgeBg = {14, 40, 66};
         ccColor3B badgeFg = kMuted;
         char const* state = "IDLE";
         if (g.recording) {
@@ -838,6 +841,7 @@ protected:
                [this]() { onPlay(); }, 0.8f);
         addBtn("Save", {152.f, -8.f}, {92.f, 30.f}, Style::Secondary, [this]() {
             if (auto pl = PlayLayer::get()) saveMacro(pl);
+            else notify("Enter a level to save", NotificationIcon::Warning);
             this->rebuild();
         }, 0.8f);
 
@@ -922,22 +926,30 @@ protected:
 
     // ----- Options tab -----
     void buildOptionsTab() {
-        addCard({48.f, 66.f}, {324.f, 60.f});
-        addText("Safe Mode", {-106.f, 80.f}, 0.9f, kText);
-        addText("Marks the level as test mode so progress is not saved.", {-106.f, 58.f}, 0.5f, kMuted, 0.f, kBody,
+        addCard({48.f, 84.f}, {324.f, 46.f});
+        addText("Safe Mode", {-106.f, 98.f}, 0.9f, kText);
+        addText("Marks the level as test mode so progress is not saved.", {-106.f, 76.f}, 0.5f, kMuted, 0.f, kBody,
                 250.f);
-        addToggle({166.f, 68.f}, []() { return safeMode(); }, [this](bool v) {
+        addToggle({166.f, 86.f}, []() { return safeMode(); }, [this](bool v) {
             Mod::get()->setSettingValue<bool>("safe-mode", v);
             this->updateSafePill();
             if (!v) notify("Safe mode off: progress and completions can be saved", NotificationIcon::Warning);
         });
 
-        addCard({48.f, -2.f}, {324.f, 60.f});
-        addText("No Clip", {-106.f, 12.f}, 0.9f, kText);
-        addText("Ignore deaths. Resets when the game restarts.", {-106.f, -10.f}, 0.5f, kMuted, 0.f, kBody, 250.f);
-        addToggle({166.f, 0.f}, []() { return g.noclip; }, [](bool v) {
+        addCard({48.f, 34.f}, {324.f, 46.f});
+        addText("No Clip", {-106.f, 48.f}, 0.9f, kText);
+        addText("Ignore deaths. Resets when the game restarts.", {-106.f, 26.f}, 0.5f, kMuted, 0.f, kBody, 250.f);
+        addToggle({166.f, 36.f}, []() { return g.noclip; }, [](bool v) {
             g.noclip = v;
             notify(v ? "No Clip on" : "No Clip off");
+        });
+
+        addCard({48.f, -16.f}, {324.f, 46.f});
+        addText("Auto Play", {-106.f, -2.f}, 0.9f, kText);
+        addText("Start the loaded macro as soon as a level opens.", {-106.f, -24.f}, 0.5f, kMuted, 0.f, kBody, 250.f);
+        addToggle({166.f, -14.f}, []() { return g.autoPlay; }, [](bool v) {
+            g.autoPlay = v;
+            notify(v ? "Auto Play on" : "Auto Play off");
         });
 
         addCard({48.f, -66.f}, {324.f, 52.f});
@@ -948,7 +960,10 @@ protected:
     // ----- Actions -----
     void onRecord() {
         auto pl = PlayLayer::get();
-        if (!pl) return;
+        if (!pl) {
+            notify("Enter a level to record", NotificationIcon::Warning);
+            return;
+        }
         if (g.recording) {
             finishRecording(pl);
             this->rebuild();
@@ -967,7 +982,10 @@ protected:
 
     void onPlay() {
         auto pl = PlayLayer::get();
-        if (!pl) return;
+        if (!pl) {
+            notify("Enter a level to play a macro", NotificationIcon::Warning);
+            return;
+        }
         if (g.playing) {
             stopPlaying(pl);
             this->rebuild();
@@ -1094,10 +1112,10 @@ void toggleMenu() {
         old->removeFromParentAndCleanup(true);
         return;
     }
-    auto pl = PlayLayer::get();
-    if (!pl) return;
-    // pause the game first so it doesn't keep running behind the menu
-    if (!scene->getChildByType<PauseLayer>(0)) pl->pauseGame(false);
+    // inside a level: pause first so the game doesn't keep running behind the menu
+    if (auto pl = PlayLayer::get()) {
+        if (!scene->getChildByType<PauseLayer>(0)) pl->pauseGame(false);
+    }
     if (auto menu = MacroMenu::create()) {
         menu->setID("menu"_spr);
         scene->addChild(menu, 9999);
@@ -1109,7 +1127,7 @@ void pollHotkey() {
 #ifdef GEODE_IS_WINDOWS
     static bool prev = false;
     bool now = false;
-    if (PlayLayer::get()) {
+    {
         auto key = Mod::get()->getSettingValue<std::string>("menu-key");
         int vk = 'Y';
         if (!key.empty() && std::isalnum(static_cast<unsigned char>(key[0]))) {
@@ -1117,7 +1135,10 @@ void pollHotkey() {
         }
         DWORD pid = 0;
         GetWindowThreadProcessId(GetForegroundWindow(), &pid);
-        now = pid == GetCurrentProcessId() && (GetAsyncKeyState(vk) & 0x8000) != 0;
+        bool inLevel = PlayLayer::get() != nullptr;
+        // in a level: the key alone; everywhere else (menus, lists): Ctrl + key so typing is never hijacked
+        bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+        now = pid == GetCurrentProcessId() && (GetAsyncKeyState(vk) & 0x8000) != 0 && (inLevel || ctrl);
     }
     if (now && !prev) toggleMenu();
     prev = now;
@@ -1196,6 +1217,17 @@ class $modify(MacroBase, GJBaseGameLayer) {
 };
 
 class $modify(MacroPlay, PlayLayer) {
+    // Auto Play: arm the loaded macro before the level starts, so the first reset begins playback
+    void setupHasCompleted() {
+        if (g.autoPlay && !g.recording && !g.events.empty()) {
+            g.playing = true;
+            g.cursor = 0;
+            g.frame = 0;
+            g.held.clear();
+        }
+        PlayLayer::setupHasCompleted();
+    }
+
     // No Clip: ignore deaths, except from the game's own anticheat spike
     void destroyPlayer(PlayerObject* player, GameObject* object) {
         if (g.noclip && object != m_anticheatSpike) return;
