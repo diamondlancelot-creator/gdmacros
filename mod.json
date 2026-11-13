@@ -6,9 +6,9 @@
 	},
 	"id": "namakamu.replaytools",
 	"name": "Replay Tools",
-	"version": "v1.5.0",
+	"version": "v1.6.0",
 	"developer": "namakamu",
-	"description": "In-game menu (hotkey Y) for speed control, macro recording/playback and No Clip. Safe mode is on by default.",
+	"description": "Menu (hotkey Y in a level, Ctrl+Y elsewhere) for speed control, macro recording/playback and No Clip. Safe mode is on by default.",
 	"settings": {
 		"safe-mode": {
 			"type": "bool",
@@ -19,8 +19,14 @@
 		"menu-key": {
 			"type": "string",
 			"name": "Menu key",
-			"description": "Letter or number that opens the mod menu inside a level (default: Y).",
+			"description": "Letter or number that opens the mod menu: the key alone inside a level, Ctrl + key elsewhere (default: Y).",
 			"default": "Y"
+		},
+		"stop-key": {
+			"type": "string",
+			"name": "Stop key",
+			"description": "Letter or number that switches the macro off (stops playback or recording) while a level is being played (default: X).",
+			"default": "X"
 		},
 		"speed": {
 			"type": "float",
