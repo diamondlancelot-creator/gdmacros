@@ -1,6 +1,6 @@
 # Replay Tools
 
-A Geode mod for Geometry Dash that adds an in-game menu (default key `Y`) with speed control, macro recording and playback, and No Clip.
+A Geode mod for Geometry Dash that adds a menu (default key `Y` in a level, `Ctrl+Y` anywhere else) with speed control, macro recording and playback, and No Clip.
 
 **Geode 5.11.2 | Geometry Dash 2.2081 | Windows**
 
@@ -9,6 +9,7 @@ A Geode mod for Geometry Dash that adds an in-game menu (default key `Y`) with s
 - **Speed control:** presets from 0.25x to 5x, plus fine adjustment in steps of 0.1 and 0.5
 - **Macro recording and playback** at 240 TPS using the GDR2 format; recordings are saved as `<level ID>_<level name>.gdr2`
 - **Macro import:** press **Import...** in the menu (works inside a level) to pick a GDR2/GDR or zBot `.zbf` file; it is copied to the macros folder and loaded. Saved macros can be listed and deleted from the menu
+- **Auto Play:** turn it on in the Options tab, load a macro, and it starts by itself whenever you open a level (resets when the game restarts)
 - **No Clip:** ignore deaths during a session (resets when the game restarts)
 - **Safe mode (on by default):** while speed changes, macro playback, or No Clip are in use, the level is marked as test mode, so progress is not saved or submitted
 
@@ -18,7 +19,7 @@ Copy `namakamu.replaytools.geode` to `%localappdata%\GeometryDash\geode\mods` an
 
 ## Usage
 
-1. Enter a level and press `Y` to open the Replay Tools menu. The key can be changed in the mod settings.
+1. Press `Y` inside a level, or `Ctrl+Y` from any other screen (main menu, level browser, etc.), to open the Replay Tools menu. Record / Play / Save need a level; Files, Import and Options work everywhere. The key can be changed in the mod settings.
 2. On the **Speed** tab, drag the slider, pick a preset, or fine-tune with the `-` / `+` buttons.
 3. On the **Macro** tab, press **Record** to restart the level and record your inputs. Press **Stop** (or finish the level) to save the macro.
 4. On the **Files** tab, press **Import...** to pick a macro file from anywhere on your PC, or press **Load** next to a macro that is already in the list. Then press **Play** on the **Macro** tab to replay it.
