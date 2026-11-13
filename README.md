@@ -31,6 +31,7 @@ Copy `namakamu.replaytools.geode` to `%localappdata%\GeometryDash\geode\mods` an
 | --- | --- |
 | Safe mode | Marks the level as test mode when speed, macro playback, or No Clip is active. On by default. |
 | Menu key | Letter or number that opens the menu in a level. Default: `Y`. |
+| Stop key | Letter or number that switches the macro off while a level is being played. Default: `X`. |
 | Game speed | Speed multiplier from 0.1 to 5.0. `1.0` is normal. |
 
 ## Notes
